@@ -2,6 +2,8 @@
 % Casper dC-L
 % Nov 2017
 
+dtype(shape): uint16(362, 434, 362)
+
 source: http://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html
 
 links:
