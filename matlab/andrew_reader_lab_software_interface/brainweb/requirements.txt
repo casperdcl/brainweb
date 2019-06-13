@@ -2,3 +2,4 @@ tqdm
 requests
 numpy
 scikit-image
+matplotlib
