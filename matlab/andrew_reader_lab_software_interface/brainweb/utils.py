@@ -3,6 +3,9 @@ try:  # py2
     from StringIO import StringIO
 except ImportError:  # py3
     from io import StringIO
+import numpy as np
+from skimage.transform import resize
+from skimage.filters import gaussian
 import logging
 
 __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
@@ -26,11 +29,6 @@ def volshow(vol, cmap="Greys_r"):
 
     return ipyw.interact(plot_slice,
         z=ipyw.IntSlider(min=0, max=len(vol) - 1, step=1, value=len(vol) // 2))
-
-import numpy as np
-from skimage.transform import resize
-from skimage.filters import gaussian
-from tqdm import tqdm
 
 
 class Act(object):
