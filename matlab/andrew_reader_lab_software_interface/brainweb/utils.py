@@ -1,8 +1,4 @@
 from __future__ import division
-try:  # py2
-    from StringIO import StringIO
-except ImportError:  # py3
-    from io import StringIO
 import numpy as np
 from skimage.transform import resize
 from skimage.filters import gaussian

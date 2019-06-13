@@ -1,4 +1,4 @@
 /subject*.mat
-/subject_*.bin
+/subject_*.bin.gz
 /subject_*.npz
 /*.py[co]
