@@ -1,3 +1,4 @@
 tqdm
 requests
 numpy
+scikit-image
