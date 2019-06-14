@@ -39,6 +39,7 @@ def volshow(vol, cmaps=None):
             plt.sca(ax)
             plt.imshow(v[z], cmap=cmap)
             plt.show()
+        plt.tight_layout(0, 0, 0)
         #return fig, axs
 
     return plot_slice
