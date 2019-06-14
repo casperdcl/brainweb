@@ -10,21 +10,38 @@ __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
 __all__ = ["volshow", "StringIO", "noise", "toPetMmr"]
 
 
-def volshow(vol, cmap="Greys_r"):
-    """Interactively slice through a 3D array in Jupyter"""
+def volshow(vol, cmaps=None):
+    """Interactively slice through 3D array(s) in Jupyter"""
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
 
-    f = plt.figure()
-    def plot_slice(z=len(vol) // 2):
-        """z  : int, slice index"""
-        plt.figure(f.number)
-        plt.clf()
-        plt.imshow(vol[z], cmap=cmap)
-        plt.show()
+    if vol[0].ndim == 2:
+        vol = [vol]
+    else:
+        assert vol[0].ndim == 3, "Input should be (one or a list of) 3D array(s)"
 
-    return ipyw.interact(plot_slice,
-        z=ipyw.IntSlider(min=0, max=len(vol) - 1, step=1, value=len(vol) // 2))
+    if cmaps is None:
+        cmaps = ["Greys_r"] * len(vol)
+
+    cols = max(1, int(len(vol) ** 0.5))
+    rows = int(np.ceil(len(vol) / cols))
+    zSize = min(len(i) for i in vol)
+    fig = plt.figure()
+
+    @ipyw.interact(z=ipyw.IntSlider(zSize // 2, 0, zSize - 1, 1))
+    def plot_slice(z):
+        """z  : int, slice index"""
+        plt.figure(fig.number)
+        plt.clf()
+        axs = fig.subplots(rows, cols, sharex=True, sharey=True)
+        axs = getattr(axs, 'flat', [axs])
+        for ax, v, cmap in zip(axs, vol, cmaps):
+            plt.sca(ax)
+            plt.imshow(v[z], cmap=cmap)
+            plt.show()
+        #return fig, axs
+
+    return plot_slice
 
 
 class Act(object):
