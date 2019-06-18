@@ -2,18 +2,46 @@ from __future__ import division
 import numpy as np
 from skimage.transform import resize
 from skimage.filters import gaussian
+from os import path
+from glob import glob
 import logging
 
 __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
 __date__ = "2017-19"
-__license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
-__all__ = ["volshow", "StringIO", "noise", "toPetMmr"]
+__licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
+__all__ = ["volshow", "noise", "toPetMmr", "get_files", "DATA_DIR"]
+
+DATA_DIR = path.dirname(path.abspath(__file__))
 
 
-def volshow(vol, cmaps=None):
-    """Interactively slice through 3D array(s) in Jupyter"""
+def get_files(data_dir=DATA_DIR):
+    """
+    Returns list of files which can be `numpy.load`ed
+    """
+    return sorted(glob(path.join(DATA_DIR, 'subject_*.npz')))
+
+
+def volshow(vol,
+            cmaps=None, colorbars=None,
+            xlabels=None, ylabels=None, titles=None,
+            sharex=True, sharey=True):
+    """
+    Interactively slice through 3D array(s) in Jupyter
+
+    @param vol  : 3darray or [3darray, ...] or {'title': 3darray, ...}
+    @param cmaps  : list of cmap [default: ["Greys_r", ...]]
+    @param xlabels, ylabels, titles  : list of strings (default blank)
+    @param sharex, sharey  : passed to `matplotlib.pyplot.subplots`
+    """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
+
+    if hasattr(vol, "keys") and hasattr(vol, "values"):
+        if titles is not None:
+            log.warn("ignoring `vol.keys()` in favour of specified `titles`")
+        else:
+            titles = vol.keys()
+            vol = vol.values()
 
     if vol[0].ndim == 2:
         vol = [vol]
@@ -22,6 +50,14 @@ def volshow(vol, cmaps=None):
 
     if cmaps is None:
         cmaps = ["Greys_r"] * len(vol)
+    if colorbars is None:
+        colorbars = [False] * len(vol)
+    if xlabels is None:
+        xlabels = [""] * len(vol)
+    if ylabels is None:
+        ylabels = [""] * len(vol)
+    if titles is None:
+        titles = [""] * len(vol)
 
     cols = max(1, int(len(vol) ** 0.5))
     rows = int(np.ceil(len(vol) / cols))
@@ -33,11 +69,19 @@ def volshow(vol, cmaps=None):
         """z  : int, slice index"""
         plt.figure(fig.number)
         plt.clf()
-        axs = fig.subplots(rows, cols, sharex=True, sharey=True)
+        axs = fig.subplots(rows, cols, sharex=sharex, sharey=sharey)
         axs = getattr(axs, 'flat', [axs])
-        for ax, v, cmap in zip(axs, vol, cmaps):
+        for ax, v, cmap, cbar, xlab, ylab, tit in zip(axs, vol, cmaps, colorbars, xlabels, ylabels, titles):
             plt.sca(ax)
             plt.imshow(v[z], cmap=cmap)
+            if cbar:
+                plt.colorbar()
+            if xlab:
+                plt.xlabel(xlab)
+            if ylab:
+                plt.ylabel(ylab)
+            if tit:
+                plt.title(tit)
             plt.show()
         plt.tight_layout(0, 0, 0)
         #return fig, axs
