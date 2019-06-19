@@ -2,6 +2,12 @@ from __future__ import division
 import numpy as np
 from skimage.transform import resize
 from skimage.filters import gaussian
+from tqdm.auto import tqdm
+import functools
+import requests
+import re
+import os
+import gzip
 from os import path
 from glob import glob
 import logging
@@ -9,16 +15,99 @@ import logging
 __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
 __date__ = "2017-19"
 __licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
-__all__ = ["volshow", "noise", "toPetMmr", "get_files", "DATA_DIR"]
+__all__ = [
+    "volshow", "get_files", "load_file", # necessary
+    "get_file", "gunzip_array",  # useful utils
+    "noise", "toPetMmr", "LINKS", #  probably not needed
+]
 
-DATA_DIR = path.dirname(path.abspath(__file__))
+LINKS = "04 05 06 18 20 38 41 42 43 44 45 46 47 48 49 50 51 52 53 54"
+LINKS = [
+    'http://brainweb.bic.mni.mcgill.ca/cgi/brainweb1' +
+    '?do_download_alias=subject' + i + '_crisp&format_value=raw_short' +
+    '&zip_value=gnuzip&download_for_real=%5BStart+download%21%5D'
+    for i in LINKS.split()]
+RE_SUBJ = re.compile('.*(subject)([0-9]+).*')
+LINKS = dict((RE_SUBJ.sub(r'\1_\2.bin.gz', i), i) for i in LINKS)
 
 
-def get_files(data_dir=DATA_DIR):
+def get_file(fname, origin, cache_dir=None):
+    """
+    Downloads a file from a URL if it not already in the cache.
+    By default the file at the url `origin` is downloaded to the
+    cache_dir `~/.brainweb`, and given the filename `fname`.
+    The final location of a file
+    `subject_04.bin.gz` would therefore be `~/.brainweb/subject_04.bin.gz`.
+    Vaguely based on:
+    https://github.com/keras-team/keras/blob/master/keras/utils/data_utils.py
+
+    @param fname  : Name of the file. If an absolute path `/path/to/file.txt` is
+        specified the file will be saved at that location.
+    @param origin  : Original URL of the file.
+    @param cache_dir  : Location to store cached files, when None it
+        defaults to `~/.brainweb`.
+    @return  : Path to the downloaded file
+    """
+    log = logging.getLogger(__name__)
+
+    if cache_dir is None:
+        cache_dir = path.join('~', '.brainweb')
+    cache_dir = path.expanduser(cache_dir)
+    if not path.exists(cache_dir):
+        try:
+            os.makedirs(cache_dir)
+        except:
+            pass
+    if not os.access(cache_dir, os.W_OK):
+        cache_dir = path.join('/tmp', '.brainweb')
+        if not path.exists(cache_dir):
+            os.makedirs(cache_dir)
+
+    fpath = path.join(cache_dir, fname)
+
+    if not path.exists(fpath):
+        log.debug("Downloading %s from %s" % (fpath, origin))
+        try:
+            d = requests.get(origin, stream=True)
+            with tqdm(total=d.headers.get('Content-length', None), desc=fname,
+                      unit="B", unit_scale=True, unit_divisor=1024,
+                      leave=False) as fprog:
+                with open(fpath, 'wb') as fo:
+                    for chunk in d.iter_content(chunk_size=None):
+                        fo.write(chunk)
+                        fprog.update(len(chunk))
+                fprog.total = fprog.n
+                fprog.refresh()
+        except (Exception, KeyboardInterrupt):
+            if path.exists(fpath):
+                os.remove(fpath)
+            raise
+
+    return fpath
+
+
+def gunzip_array(fpath, shape=None, dtype=None):
+    """
+    Uncompress the specified file and read the binary output as an array.
+    """
+    with gzip.open(fpath) as fi:
+        data = np.frombuffer(fi.read(), dtype=dtype)
+    if shape is not None:
+        return data.reshape(shape)
+
+
+load_file = functools.partial(gunzip_array,
+    shape=(362, 434, 362), dtype=np.uint16)
+
+
+def get_files(cache_dir=None):
     """
     Returns list of files which can be `numpy.load`ed
     """
-    return sorted(glob(path.join(DATA_DIR, 'subject_*.npz')))
+    files = []
+    for f, url in tqdm(LINKS.items(), unit="file", desc="BrainWeb Subjects"):
+        files.append(get_file(f, url, cache_dir=cache_dir))
+    return sorted(files)
 
 
 def volshow(vol,
