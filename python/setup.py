@@ -12,7 +12,7 @@ except ImportError:
 __author__ = None
 __licence__ = None
 __version__ = None
-main_file = os_path.join(os_path.dirname(__file__), '__init__.py')
+main_file = os_path.join(os_path.dirname(__file__), 'brainweb', '__init__.py')
 for l in io_open(main_file, mode='r'):
     if any(l.startswith(i) for i in ('__author__', '__licence__', '__version__')):
         exec(l)
