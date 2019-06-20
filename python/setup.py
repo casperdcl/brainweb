@@ -34,8 +34,9 @@ setup(
     #bugtrack_url='https://github.com/casperdcl/brainweb/issues',
     platforms=['any'],
     packages=['brainweb'],
-    #install_requires=['argparse'] if sys.version_info[:2] < (2, 7) else [],
-    #package_data={'': ['LICENCE']},
+    install_requires=['tqdm', 'requests', 'numpy', 'scikit-image'],
+    extras_require=dict(plot=['matplotlib']),
+    #package_data={'brainweb': ['LICENCE']},
     classifiers=[
         # Trove classifiers
         # (https://pypi.python.org/pypi?%3Aaction=list_classifiers)

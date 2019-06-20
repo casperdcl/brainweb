@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np
+from numpy.random import seed
 from skimage.transform import resize
 from skimage.filters import gaussian
 from tqdm.auto import tqdm
@@ -16,9 +17,9 @@ __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
 __date__ = "2017-19"
 __licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
 __all__ = [
-    "volshow", "get_files", "load_file", # necessary
+    "volshow", "get_files", "load_file", "get_mmr", # necessary
     "get_file", "gunzip_array",  # useful utils
-    "noise", "toPetMmr", "LINKS", #  probably not needed
+    "noise", "seed", "toPetMmr", "LINKS", #  probably not needed
 ]
 
 LINKS = "04 05 06 18 20 38 41 42 43 44 45 46 47 48 49 50 51 52 53 54"
@@ -108,6 +109,26 @@ def get_files(cache_dir=None):
     for f, url in tqdm(LINKS.items(), unit="file", desc="BrainWeb Subjects"):
         files.append(get_file(f, url, cache_dir=cache_dir))
     return sorted(files)
+
+
+def get_mmr(cache_file, raw_data,
+            petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
+            petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0):
+    """
+    Return contents of specified `*.npz` file,
+    creating it from BrainWeb `raw_data` 3darray if it doesn't exist.
+    """
+    if not path.exists(cache_file):
+        pet, uMap, t1, t2 = toPetMmr(raw_data)
+        pet = noise(pet, petNoise, sigma=petSigma)[:, ::-1]
+        t1 = noise(t1, t1Noise, sigma=t1Sigma)[:, ::-1]
+        t2 = noise(t2, t2Noise, sigma=t2Sigma)[:, ::-1]
+        uMap = uMap[:, ::-1]
+        np.savez_compressed(cache_file, PET=pet, uMap=uMap, T1=t1, T2=t2,
+            petNoise=petNoise, t1Noise=t1Noise, t2Noise=t2Noise,
+            petSigma=petSigma, t1Sigma=t1Sigma, t2Sigma=t2Sigma)
+
+    return np.load(cache_file, allow_pickle=True)
 
 
 def volshow(vol,
