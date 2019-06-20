@@ -1,0 +1,119 @@
+The relevant file is `README.ipynb <README.ipynb>`__, accessible via any
+of the following:
+
+- |Binder|
+- `GitHub Preview <https://github.com/casperdcl/apirl/blob/casper/python/brainweb/README.ipynb>`__
+- `Local file <README.ipynb>`__
+
+.. |Binder| image:: https://mybinder.org/badge_logo.svg
+   :target: https://mybinder.org/v2/gh/casperdcl/apirl/casper?filepath=python%2Fbrainweb%2FREADME.ipynb
+
+BrainWeb: Multimodal models of 20 normal brains
+===============================================
+
+**Download and Preprocessing for PET-MR Simulations**
+
+This notebook will not re-download/re-process files if they already
+exist.
+
+-  Output data
+-  ``~/.brainweb/subject_*.npz``: dtype(shape):
+   ``float32(127, 344, 344)``
+-  `Raw data
+   source <http://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html>`__
+-  ``~/.brainweb/subject_*.bin.gz``: dtype(shape):
+   ``uint16(362, 434, 362)``
+-  Prerequisites
+-  Python: `requirements.txt <../../requirements.txt>`__ (e.g.
+   ``pip install -r ../../requirements.txt``)
+
+--------------
+
+-  Author: Casper da Costa-Luis <casper.dcl@physics.org>
+-  Date: 2017-19
+-  Licence: `MPLv2.0 <https://www.mozilla.org/MPL/2.0>`__
+
+.. code:: python
+
+    from __future__ import print_function, division
+    %matplotlib notebook
+    from utils import volshow
+    import utils as brainweb
+    import numpy as np
+    from os import path
+    from tqdm.auto import tqdm
+    import logging
+    logging.basicConfig(level=logging.INFO)
+
+Raw Data
+--------
+
+.. code:: python
+
+    # download
+    files = brainweb.get_files()
+
+    # read
+    data = []
+    for f in tqdm(files, desc="Uncompressing into memory", unit="subject"):
+        data.append(brainweb.load_file(f))
+
+.. code:: python
+
+    # show last subject
+    print(files[-1])
+    volshow(data[-1]);
+
+
+.. parsed-literal::
+
+    ~/.brainweb/subject_54.bin.gz
+
+.. image:: raw.png
+
+Transform
+---------
+
+Convert raw image data:
+
+-  Siemens Biograph mMR resolution (~2mm) & dimensions (127, 344, 344)
+-  PET/T1/T2/uMap intensities
+-  randomised structure for PET/T1/T2
+-  t (1 + g [2 G_sigma(r) - 1]), where
+
+   -  r = rand(127, 344, 344) in [0, 1),
+   -  Gaussian smoothing sigma = 1,
+   -  g = 1 for PET; 0.75 for MR, and
+   -  t = the PET or MR piecewise constant phantom
+
+.. code:: python
+
+    brainweb.seed(1337)
+
+    with tqdm(total=len(files), desc="mMR ground truths", unit="subject") as progress:
+        for (f, vol) in zip(files, data):
+            cache = f.replace('.bin.gz', '.npz')
+            vol = brainweb.get_mmr(cache, vol,
+                                   petNoise=1, t1Noise=0.75, t2Noise=0.75,
+                                   petSigma=1, t1Sigma=1, t2Sigma=1)
+            progress.update()
+
+.. code:: python
+
+    # show last subject
+    #f = files[-1].replace('.bin.gz', '.npz')
+    #vol = np.load(f)
+    print(f)
+    volshow([vol['PET' ][:, 100:-100, 100:-100],
+             vol['uMap'][:, 100:-100, 100:-100],
+             vol['T1'  ][:, 100:-100, 100:-100],
+             vol['T2'  ][:, 100:-100, 100:-100]],
+            cmaps=["hot", "bone", "Greys_r", "Greys_r"],
+            titles=["PET", "uMap", "T1", "T2"]);
+
+
+.. parsed-literal::
+
+    ~/.brainweb/subject_54.bin.gz
+
+.. image:: mMR.png
