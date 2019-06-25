@@ -219,7 +219,9 @@ class Pet(Act):
   whiteMatter = 32
   greyMatter = whiteMatter * 4
   skin = whiteMatter // 2
-  attrs = ["whiteMatter", "greyMatter", "skin"]
+  hot = greyMatter * 1.5
+  cold = whiteMatter * 0.5
+  attrs = ["whiteMatter", "greyMatter", "skin", "hot", "cold"]
 
 
 class T1(Act):
@@ -230,8 +232,10 @@ class T1(Act):
   marrow = 180
   bone = 48
   csf = 48
+  hot = greyMatter * 1.5
+  cold = whiteMatter * 0.8
   attrs = ["whiteMatter", "greyMatter", "skin", "skull", "marrow", "bone",
-           "csf"]
+           "csf", "hot", "cold"]
 
 
 class T2(T1):
@@ -242,6 +246,8 @@ class T2(T1):
   marrow = 250
   csf = 250
   bone = 200
+  hot = greyMatter * 1.5
+  cold = whiteMatter * 0.8
 
 
 mu_bone_1_cm = 0.13
@@ -334,6 +340,69 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR"):
     return arr.astype(dtype)
 
   return [resizeToMmr(i) for i in [res, muMap, t1, t2]]
+
+
+def lesionMmr(im3d, wmm=Shape.mMR[-1] * Res.mMR[-1], diam=5,
+      intensity=Pet.hot, num=1, blur=0):
+    """
+    im3d  : 3darray
+    wmm  : `im3d` width in mm
+    diam  : minimum tumour diameter [default: 5mm]
+    intensity  : tumour intensity [default: Pet.hot]
+    num  : number of tumours [default: 1]
+    blur  : minimum Gaussian FWHM for tumours [default: 0mm]
+    """
+    # tumours specified by fractional positions d, h, w, radius/[w], sigma/[w]
+    rad = diam / (2 * wmm)
+    sigma = blur / (np.sqrt(8 * np.log(2)) * wmm)
+
+    # coords: depth, height, width
+    d, h, w = im3d.shape
+
+    pad = 6  #1.5  # place tumours in circle of diameter = 2 / pad
+    if num > 0:
+      z = 0.5
+      for r, t in np.random.random((2, num))
+        x, y = pol2cart(r * 2 * np.pi, t)
+        # centre about 0.5
+        y = (y + 1) / 2
+        x = (x + 1) / 2
+        im3d = np.max([im3d,
+            tumour((d, h, w), (z, y, x), rad, sigma=sigma, intensity=intensity, scale=1/pad)],
+            axis=0)
+    else:
+      raise NotImplementedError
+    # im3d = im3d / im3d.max()
+    return im3d
+
+
+def tumour(out_shape, loc, rad, sigma=0, intensity=Pet.hot, scale=1):
+    """
+    out_shape  : image depth, height, width
+    loc  : z, y, x of centre of tumour
+    rad  : radius of tumour
+    scale (default 1) towards centre for tumour z/y/x
+    """
+    d, h, w = out_shape
+
+    z, y, x = np.array(loc) - 0.5
+    phi, theta, r = cart2sph(x, y, z)
+    x, y, z = sph2cart(phi, theta, r * scale) + 0.5
+
+    T = [z, y, x, rSmall, maxScale, sigma] .* [d, h, w, w, intensity, w]
+
+    % [D, H, W, R, V, S] = T;
+    S = T(6);
+
+    [X, Y, Z] = meshgrid(1:w, 1:h, 1:d);
+    im3d = ((X-T(3)).^2 + (Y-T(2)).^2 + (Z-T(1)).^2 <= T(4)^2) .* T(5);
+    if S > 0
+      im3d = imgaussfilt3(im3d, S);
+    end
+
+    im3d = permute(im3d, [3 2 1]);
+
+    return im3d
 
 
 def matify(mat, dtype=np.float32, transpose=None):
