@@ -17,8 +17,8 @@ __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
 __date__ = "2017-19"
 __licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
 __all__ = [
-    "volshow", "get_files", "load_file", "get_mmr", # necessary
-    "get_file", "gunzip_array",  # useful utils
+    "volshow", "get_files", "get_mmr_fromfile", # necessary
+    "get_file", "load_file", "gunzip_array",  # useful utils
     "noise", "seed", "toPetMmr", "LINKS", #  probably not needed
 ]
 
@@ -124,11 +124,27 @@ def get_mmr(cache_file, raw_data,
         t1 = noise(t1, t1Noise, sigma=t1Sigma)[:, ::-1]
         t2 = noise(t2, t2Noise, sigma=t2Sigma)[:, ::-1]
         uMap = uMap[:, ::-1]
-        np.savez_compressed(cache_file, PET=pet, uMap=uMap, T1=t1, T2=t2,
-            petNoise=petNoise, t1Noise=t1Noise, t2Noise=t2Noise,
-            petSigma=petSigma, t1Sigma=t1Sigma, t2Sigma=t2Sigma)
+        np.savez_compressed(cache_file,
+            PET=pet, uMap=uMap, T1=t1, T2=t2,
+            petNoise=np.float32(petNoise),
+            t1Noise=np.float32(t1Noise),
+            t2Noise=np.float32(t2Noise),
+            petSigma=np.float32(petSigma),
+            t1Sigma=np.float32(t1Sigma),
+            t2Sigma=np.float32(t2Sigma))
 
     return np.load(cache_file, allow_pickle=True)
+
+
+def get_mmr_fromfile(brainweb_file,
+                     petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
+                     petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0):
+    """
+    mMR resolution ground truths from a cached `np.load`able file generated from
+    `brainweb_file`.
+    """
+    dat = load_file(brainweb_file)  # read raw data
+    return get_mmr(brainweb_file.replace('.bin.gz', '.npz'), dat)
 
 
 def volshow(vol,
@@ -221,7 +237,7 @@ class Pet(Act):
   skin = whiteMatter // 2
   hot = greyMatter * 1.5
   cold = whiteMatter * 0.5
-  attrs = ["whiteMatter", "greyMatter", "skin", "hot", "cold"]
+  attrs = ["whiteMatter", "greyMatter", "skin"]
 
 
 class T1(Act):
@@ -235,7 +251,7 @@ class T1(Act):
   hot = greyMatter * 1.5
   cold = whiteMatter * 0.8
   attrs = ["whiteMatter", "greyMatter", "skin", "skull", "marrow", "bone",
-           "csf", "hot", "cold"]
+           "csf"]
 
 
 class T2(T1):
@@ -255,12 +271,14 @@ mu_tissue_1_cm = 0.0975
 
 
 class Res(object):
+  """in mm"""
   mMR = np.array([2.0312, 2.0863, 2.0863])
   MR = np.array([1.0, 1.0, 1.0])
   brainweb = np.array([0.5, 0.5, 0.5])
 
 
 class Shape(object):
+  """in voxels"""
   mMR = np.array([127, 344, 344])
   MR = mMR * Res.mMR / Res.MR
   brainweb = mMR * Res.mMR / Res.brainweb
@@ -284,7 +302,8 @@ def noise(im, n, warn_zero=True, sigma=1):
     if warn_zero:
       log.warn("zero noise")
     return im
-  r = gaussian(np.random.rand(*im.shape), sigma=sigma, multichannel=False)
+  r = gaussian(np.random.random(im.shape), sigma=sigma, multichannel=False)
+  r = r.astype(im.dtype)
   return im * (1 + n * (2 * r - 1))
 
 
@@ -307,7 +326,7 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR"):
   # muMap
   muMap = np.zeros(im.shape, dtype=dtype)
   muMap[im != 0] = mu_tissue_1_cm
-  muMap[Act.indices(im, "bone")] = mu_bone_1_cm
+  muMap[Act.indices(im, 'bone')] = mu_bone_1_cm
 
   # MR
   # t1 = np.zeros(im.shape, dtype=dtype)
@@ -330,30 +349,31 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR"):
     # arr = arr.astype(np.float32)
     # arr /= arr.max()
     arr = resize(arr, new_shape,
-                 order=1, mode="constant", anti_aliasing=False)
+                 order=1, mode='constant', anti_aliasing=False,
+                 preserve_range=True).astype(dtype)
     if pad:
       arr = np.pad(arr, [(p, p + r) for (p, r)
                          in zip(padLR.astype(int), padR.astype(int))],
                    mode="constant")
-    if arr.dtype == np.uint16:
-      return np.asarray(arr, dtype=np.float32) * np.float32(2 ** 16)
-    return arr.astype(dtype)
+    return arr
 
   return [resizeToMmr(i) for i in [res, muMap, t1, t2]]
 
 
-def lesionMmr(im3d, wmm=Shape.mMR[-1] * Res.mMR[-1], diam=5,
+'''
+def lesionMmr(im3d, dim=Shape.mMR[-1] * Res.mMR[-1], diam=5,
       intensity=Pet.hot, num=1, blur=0):
     """
-    im3d  : 3darray
-    wmm  : `im3d` width in mm
-    diam  : minimum tumour diameter [default: 5mm]
+    im3d  : 3darray in which to embed tumour(s)
+    dim  : `im3d` dimensions [default: Shape.mMR * Res.mMR]mm
+    diam  : tumour diameter [default: 5]mm
     intensity  : tumour intensity [default: Pet.hot]
     num  : number of tumours [default: 1]
     blur  : minimum Gaussian FWHM for tumours [default: 0mm]
     """
     # tumours specified by fractional positions d, h, w, radius/[w], sigma/[w]
-    rad = diam / (2 * wmm)
+    wmm = dim[-1]
+    rad = diam / (2 * dim)
     sigma = blur / (np.sqrt(8 * np.log(2)) * wmm)
 
     # coords: depth, height, width
@@ -362,7 +382,7 @@ def lesionMmr(im3d, wmm=Shape.mMR[-1] * Res.mMR[-1], diam=5,
     pad = 6  #1.5  # place tumours in circle of diameter = 2 / pad
     if num > 0:
       z = 0.5
-      for r, t in np.random.random((2, num))
+      for r, t in np.random.random((2, num)):
         x, y = pol2cart(r * 2 * np.pi, t)
         # centre about 0.5
         y = (y + 1) / 2
@@ -391,18 +411,18 @@ def tumour(out_shape, loc, rad, sigma=0, intensity=Pet.hot, scale=1):
 
     T = [z, y, x, rSmall, maxScale, sigma] .* [d, h, w, w, intensity, w]
 
-    % [D, H, W, R, V, S] = T;
+    # [D, H, W, R, V, S] = T;
     S = T(6);
 
-    [X, Y, Z] = meshgrid(1:w, 1:h, 1:d);
+    X, Y, Z = meshgrid(1:w, 1:h, 1:d);
     im3d = ((X-T(3)).^2 + (Y-T(2)).^2 + (Z-T(1)).^2 <= T(4)^2) .* T(5);
-    if S > 0
-      im3d = imgaussfilt3(im3d, S);
-    end
+    if S > 0:
+      im3d = imgaussfilt3(im3d, S)
 
-    im3d = permute(im3d, [3 2 1]);
+    im3d = permute(im3d, [3 2 1])
 
     return im3d
+'''
 
 
 def matify(mat, dtype=np.float32, transpose=None):
