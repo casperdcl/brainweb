@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from numpy.random import seed
 from skimage.transform import resize
-from skimage.filters import gaussian
+from scipy.ndimage.filters import gaussian_filter
 from tqdm.auto import tqdm
 import functools
 import requests
@@ -17,10 +17,12 @@ __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
 __date__ = "2017-19"
 __licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
 __all__ = [
-    "volshow", "get_files", "get_mmr_fromfile", # necessary
-    "get_file", "load_file", "gunzip_array",  # useful utils
-    "noise", "seed", "toPetMmr", "LINKS", #  probably not needed
-]
+    # necessary
+    "volshow", "get_files", "get_mmr_fromfile",
+    # useful utils
+    "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions",
+    # probably not needed
+    "noise", "seed", "toPetMmr", "LINKS"]
 
 LINKS = "04 05 06 18 20 38 41 42 43 44 45 46 47 48 49 50 51 52 53 54"
 LINKS = [
@@ -302,8 +304,7 @@ def noise(im, n, warn_zero=True, sigma=1):
     if warn_zero:
       log.warn("zero noise")
     return im
-  r = gaussian(np.random.random(im.shape), sigma=sigma, multichannel=False)
-  r = r.astype(im.dtype)
+  r = gaussian_filter(np.random.random(im.shape), sigma=sigma, mode='constant')
   return im * (1 + n * (2 * r - 1))
 
 
@@ -360,69 +361,69 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR"):
   return [resizeToMmr(i) for i in [res, muMap, t1, t2]]
 
 
-'''
-def lesionMmr(im3d, dim=Shape.mMR[-1] * Res.mMR[-1], diam=5,
-      intensity=Pet.hot, num=1, blur=0):
+def ellipsoid(out_shape, radii, position, dtype=np.float32):
     """
-    im3d  : 3darray in which to embed tumour(s)
-    dim  : `im3d` dimensions [default: Shape.mMR * Res.mMR]mm
-    diam  : tumour diameter [default: 5]mm
-    intensity  : tumour intensity [default: Pet.hot]
-    num  : number of tumours [default: 1]
-    blur  : minimum Gaussian FWHM for tumours [default: 0mm]
+    out_shape  : 3-tuple
+    radii  : 3-tuple, radii of ellipsoid
+    position  : 3-tuple, centre within `out_shape` to place 3d ellipsoid
     """
-    # tumours specified by fractional positions d, h, w, radius/[w], sigma/[w]
-    wmm = dim[-1]
-    rad = diam / (2 * dim)
-    sigma = blur / (np.sqrt(8 * np.log(2)) * wmm)
+    # grid for support points at centre `position`
+    grid = [slice(-x0, dim - x0) for x0, dim in zip(position, out_shape)]
+    position = np.ogrid[grid]
+    # distance of all points from `position` scaled by radius
+    out = np.zeros(out_shape, dtype=np.float32)
+    for x_i, semisize in zip(position, radii):
+        out += np.abs(x_i / semisize) ** 2
+    return (out <= 1).astype(dtype)
 
-    # coords: depth, height, width
-    d, h, w = im3d.shape
 
-    pad = 6  #1.5  # place tumours in circle of diameter = 2 / pad
-    if num > 0:
-      z = 0.5
-      for r, t in np.random.random((2, num)):
-        x, y = pol2cart(r * 2 * np.pi, t)
-        # centre about 0.5
-        y = (y + 1) / 2
-        x = (x + 1) / 2
-        im3d = np.max([im3d,
-            tumour((d, h, w), (z, y, x), rad, sigma=sigma, intensity=intensity, scale=1/pad)],
-            axis=0)
-    else:
-      raise NotImplementedError
-    # im3d = im3d / im3d.max()
+def add_lesions(im3d, dim=Res.mMR * Shape.mMR, diam=None, intensity=None, blur=None, thresh=0.9 * Pet.whiteMatter):
+    """
+    im3d  : 3darray
+    dim  : `im3d` dimensions [default: Res.mMR * Shape.mMR]mm
+    diam  : [default: [15, 7, 8, 5]]
+    intensity  : [default: [Pet.hot, -Pet.cold, Pet.hot, Pet.hot]]
+    blur  : [default: [0, 2, 2.5, 0]]
+    thresh  : Minimum `im3d` value on which a tumour can be overlaid [default: 0.9 * Pet.whiteMatter]
+    """
+    diam = diam or [15, 7, 8, 5]
+    intensity = intensity or [Pet.hot, -Pet.cold, Pet.hot, Pet.hot]
+    blur = blur or [0, 2, 2.5, 0]
+
+    rad = max(diam) / (2 * dim) * im3d.shape
+    # locations not too close to edges for centre of tumours
+    msk = gaussian_filter((im3d > thresh).astype(np.float32), rad) > 0.7
+    # only central slice
+    msk[:im3d.shape[0] // 2] = 0
+    msk[im3d.shape[0] // 2 + 1:] = 0
+    # make different quadrants
+    msk = msk.astype(np.uint8)
+    #msk[:, :im3d.shape[1] // 2, :im3d.shape[2] // 2] *= 1
+    msk[:, :im3d.shape[1] // 2, im3d.shape[2] // 2:] *= 2
+    msk[:, im3d.shape[1] // 2:, :im3d.shape[2] // 2] *= 3
+    msk[:, im3d.shape[1] // 2:, im3d.shape[2] // 2:] *= 4
+    im3d = im3d.copy()  # be safe
+
+    params = list(zip(diam, intensity, blur))
+    np.random.shuffle(params)
+    for i, (d, peak, fwhm) in enumerate(params):
+        quadrant = i % 4
+        ZYX = np.asarray(np.where(msk == quadrant + 1))
+        position = ZYX[:, np.random.choice(ZYX.shape[1])]
+        radii = d / (2 * dim) * im3d.shape
+        tumour = peak * ellipsoid(im3d.shape, radii, position, dtype=im3d.dtype)
+        if fwhm:
+            sigma = fwhm / (np.sqrt(8 * np.log(2)) * dim) * im3d.shape
+            tumour = gaussian_filter(tumour, sigma, mode='constant').astype(tumour.dtype)
+        if peak > 0:
+            im3d = np.max([im3d, tumour], axis=0)
+        else:
+            #tROI = tumour > 0
+            #im3d[tROI] = tumour[tROI]
+            im3d += tumour
+            #im3d[tROI] = np.min([im3d[tROI], tumour[tROI]], axis=0)
+
     return im3d
-
-
-def tumour(out_shape, loc, rad, sigma=0, intensity=Pet.hot, scale=1):
-    """
-    out_shape  : image depth, height, width
-    loc  : z, y, x of centre of tumour
-    rad  : radius of tumour
-    scale (default 1) towards centre for tumour z/y/x
-    """
-    d, h, w = out_shape
-
-    z, y, x = np.array(loc) - 0.5
-    phi, theta, r = cart2sph(x, y, z)
-    x, y, z = sph2cart(phi, theta, r * scale) + 0.5
-
-    T = [z, y, x, rSmall, maxScale, sigma] .* [d, h, w, w, intensity, w]
-
-    # [D, H, W, R, V, S] = T;
-    S = T(6);
-
-    X, Y, Z = meshgrid(1:w, 1:h, 1:d);
-    im3d = ((X-T(3)).^2 + (Y-T(2)).^2 + (Z-T(1)).^2 <= T(4)^2) .* T(5);
-    if S > 0:
-      im3d = imgaussfilt3(im3d, S)
-
-    im3d = permute(im3d, [3 2 1])
-
-    return im3d
-'''
 
 
 def matify(mat, dtype=np.float32, transpose=None):
