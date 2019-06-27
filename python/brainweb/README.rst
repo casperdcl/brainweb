@@ -37,8 +37,8 @@ exist.
 
     from __future__ import print_function, division
     %matplotlib notebook
-    from utils import volshow
-    import utils as brainweb
+    import brainweb
+    from brainweb import volshow
     import numpy as np
     from os import path
     from tqdm.auto import tqdm
@@ -53,19 +53,14 @@ Raw Data
     # download
     files = brainweb.get_files()
 
-    # read
-    data = []
-    for f in tqdm(files, desc="Uncompressing into memory", unit="subject"):
-        data.append(brainweb.load_file(f))
-
-.. code:: python
+    # read last file
+    data = brainweb.load_file(files[-1])
 
     # show last subject
     print(files[-1])
-    volshow(data[-1]);
+    volshow(data, cmaps=['gist_ncar']);
 
-
-.. parsed-literal::
+::
 
     ~/.brainweb/subject_54.bin.gz
 
@@ -90,30 +85,34 @@ Convert raw image data:
 
     brainweb.seed(1337)
 
-    with tqdm(total=len(files), desc="mMR ground truths", unit="subject") as progress:
-        for (f, vol) in zip(files, data):
-            cache = f.replace('.bin.gz', '.npz')
-            vol = brainweb.get_mmr(cache, vol,
-                                   petNoise=1, t1Noise=0.75, t2Noise=0.75,
-                                   petSigma=1, t1Sigma=1, t2Sigma=1)
-            progress.update()
+    for f in tqdm(files, desc="mMR ground truths", unit="subject"):
+        vol = brainweb.get_mmr_fromfile(
+            f,
+            petNoise=1, t1Noise=0.75, t2Noise=0.75,
+            petSigma=1, t1Sigma=1, t2Sigma=1)
 
 .. code:: python
 
     # show last subject
-    #f = files[-1].replace('.bin.gz', '.npz')
-    #vol = np.load(f)
     print(f)
     volshow([vol['PET' ][:, 100:-100, 100:-100],
              vol['uMap'][:, 100:-100, 100:-100],
              vol['T1'  ][:, 100:-100, 100:-100],
              vol['T2'  ][:, 100:-100, 100:-100]],
-            cmaps=["hot", "bone", "Greys_r", "Greys_r"],
+            cmaps=['hot', 'bone', 'Greys_r', 'Greys_r'],
             titles=["PET", "uMap", "T1", "T2"]);
 
-
-.. parsed-literal::
+::
 
     ~/.brainweb/subject_54.bin.gz
 
 .. image:: mMR.png
+
+.. code:: python
+
+    # add some lesions
+    brainweb.seed(1337)
+    im3d = brainweb.add_lesions(vol['PET'])
+    volshow(im3d[:, 100:-100, 100:-100], cmaps=['hot']);
+
+.. image:: lesions.png
