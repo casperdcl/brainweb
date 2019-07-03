@@ -1,2 +1,2 @@
 recursive-include brainweb *.py
-include README.rst
+include brainweb/README.*
