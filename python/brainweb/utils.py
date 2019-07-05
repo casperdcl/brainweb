@@ -156,7 +156,8 @@ def volshow(vol,
     """
     Interactively slice through 3D array(s) in Jupyter
 
-    @param vol  : 3darray or [3darray, ...] or {'title': 3darray, ...}
+    @param vol  : imarray or [imarray, ...] or {'title': imarray, ...}
+      Note that imarray may be 3D (mono) or 4D (last channel rgb(a))
     @param cmaps  : list of cmap [default: ["Greys_r", ...]]
     @param xlabels, ylabels, titles  : list of strings (default blank)
     @param sharex, sharey  : passed to `matplotlib.pyplot.subplots`
@@ -171,10 +172,11 @@ def volshow(vol,
             titles = vol.keys()
             vol = vol.values()
 
-    if vol[0].ndim == 2:
+    if vol[0].ndim == 2:  # single 3darray
         vol = [vol]
     else:
-        assert vol[0].ndim == 3, "Input should be (one or a list of) 3D array(s)"
+        for v in vol:
+            assert v.ndim in [3, 4], "Input should be (one or a list of) 3D and/or 4D array(s)"
 
     if cmaps is None:
         cmaps = ["Greys_r"] * len(vol)
