@@ -152,7 +152,8 @@ def get_mmr_fromfile(brainweb_file,
 def volshow(vol,
             cmaps=None, colorbars=None,
             xlabels=None, ylabels=None, titles=None,
-            sharex=True, sharey=True):
+            sharex=True, sharey=True,
+            ncols=None, nrows=None):
     """
     Interactively slice through 3D array(s) in Jupyter
 
@@ -160,7 +161,7 @@ def volshow(vol,
       Note that imarray may be 3D (mono) or 4D (last channel rgb(a))
     @param cmaps  : list of cmap [default: ["Greys_r", ...]]
     @param xlabels, ylabels, titles  : list of strings (default blank)
-    @param sharex, sharey  : passed to `matplotlib.pyplot.subplots`
+    @param sharex, sharey, ncols, nrows  : passed to `matplotlib.pyplot.subplots`
     """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
@@ -189,8 +190,17 @@ def volshow(vol,
     if titles is None:
         titles = [""] * len(vol)
 
-    cols = max(1, int(len(vol) ** 0.5))
-    rows = int(np.ceil(len(vol) / cols))
+    # automatically square-ish grid, slightly favouring more rows
+    if nrows:
+        rows = nrows
+        cols = ncols or int(np.ceil(len(vol) / rows))
+    else:
+        cols = ncols or max(1, int(len(vol) ** 0.5))
+        rows = int(np.ceil(len(vol) / cols))
+    # special case
+    if not (nrows or ncols) and len(vol) == 4:
+        nrows = ncols = 2
+
     zSize = min(len(i) for i in vol)
     fig = plt.figure()
 
