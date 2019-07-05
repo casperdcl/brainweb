@@ -153,7 +153,8 @@ def volshow(vol,
             cmaps=None, colorbars=None,
             xlabels=None, ylabels=None, titles=None,
             sharex=True, sharey=True,
-            ncols=None, nrows=None):
+            ncols=None, nrows=None,
+            figsize=None, frameon=True):
     """
     Interactively slice through 3D array(s) in Jupyter
 
@@ -162,6 +163,7 @@ def volshow(vol,
     @param cmaps  : list of cmap [default: ["Greys_r", ...]]
     @param xlabels, ylabels, titles  : list of strings (default blank)
     @param sharex, sharey, ncols, nrows  : passed to `matplotlib.pyplot.subplots`
+    @param figsize, frameon  : passed to `matplotlib.pyplot.figure`
     """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
@@ -202,13 +204,12 @@ def volshow(vol,
         nrows = ncols = 2
 
     zSize = min(len(i) for i in vol)
-    fig = plt.figure()
+    fig = plt.figure(figsize=figsize, frameon=frameon)
 
     @ipyw.interact(z=ipyw.IntSlider(zSize // 2, 0, zSize - 1, 1))
     def plot_slice(z):
         """z  : int, slice index"""
-        plt.figure(fig.number)
-        plt.clf()
+        plt.figure(fig.number, clear=True)
         axs = fig.subplots(rows, cols, sharex=sharex, sharey=sharey)
         axs = getattr(axs, 'flat', [axs])
         for ax, v, cmap, cbar, xlab, ylab, tit in zip(axs, vol, cmaps, colorbars, xlabels, ylabels, titles):
