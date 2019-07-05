@@ -1,37 +1,38 @@
-The relevant file is `README.ipynb <README.ipynb>`__, accessible via any
-of the following:
+The following example may be launched interactively via any of the following:
 
 - |Binder|
-- `GitHub Preview <https://github.com/casperdcl/apirl/blob/casper/python/brainweb/README.ipynb>`__
 - `Local file <README.ipynb>`__
+- `GitHub Preview <https://github.com/casperdcl/brainweb/blob/master/README.ipynb>`__
 
 .. |Binder| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/casperdcl/apirl/casper?filepath=python%2Fbrainweb%2FREADME.ipynb
+   :target: https://mybinder.org/v2/gh/casperdcl/brainweb/master?filepath=README.ipynb
 
-BrainWeb: Multimodal models of 20 normal brains
-===============================================
+BrainWeb-based multimodal models of 20 normal brains
+====================================================
 
 **Download and Preprocessing for PET-MR Simulations**
 
 This notebook will not re-download/re-process files if they already
 exist.
 
--  Output data
--  ``~/.brainweb/subject_*.npz``: dtype(shape):
-   ``float32(127, 344, 344)``
--  `Raw data
-   source <http://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html>`__
--  ``~/.brainweb/subject_*.bin.gz``: dtype(shape):
-   ``uint16(362, 434, 362)``
--  Prerequisites
--  Python: `requirements.txt <../../requirements.txt>`__ (e.g.
-   ``pip install -r ../../requirements.txt``)
+- Output data
+
+  - ``~/.brainweb/subject_*.npz``: dtype(shape): ``float32(127, 344, 344)``
+
+- `Raw data source <http://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html>`__
+
+  - ``~/.brainweb/subject_*.bin.gz``: dtype(shape): ``uint16(362, 434, 362)``
+
+- Prerequisites
+
+  - Python: `requirements.txt <../../requirements.txt>`__ (e.g.
+       ``pip install -r ../../requirements.txt``)
 
 --------------
 
--  Author: Casper da Costa-Luis <casper.dcl@physics.org>
--  Date: 2017-19
--  Licence: `MPLv2.0 <https://www.mozilla.org/MPL/2.0>`__
+- Author: Casper da Costa-Luis <casper.dcl@physics.org>
+- Date: 2017-19
+- Licence: `MPLv2.0 <https://www.mozilla.org/MPL/2.0>`__
 
 .. code:: python
 

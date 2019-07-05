@@ -1,1 +1,6 @@
-/build
+*.py[co]
+.ipynb_checkpoints/
+__pycache__/
+/build/
+/dist/
+/*.egg-info/
