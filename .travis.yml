@@ -1,0 +1,19 @@
+language: python
+matrix:
+  include:
+  - python: 2.7
+  - python: 3.6
+  - python: 3.7-dev
+cache:
+  pip: true
+  directories:
+    - $HOME/.cache/pip
+before_cache:
+  - rm -f $HOME/.cache/pip/log/debug.log
+notifications:
+  email: false
+install:
+  - pip install .[test]
+script:
+  - python setup.py check -mrs
+  - flake8 --exit-zero
