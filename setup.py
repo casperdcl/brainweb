@@ -15,7 +15,9 @@ __version__ = None
 main_file = os_path.join(os_path.dirname(__file__), 'brainweb', '__init__.py')
 for l in io_open(main_file, mode='r'):
     if any(l.startswith(i) for i in ('__author__', '__licence__', '__version__')):
-        exec(l)
+        i, val = l.rsplit('=', 1)
+        globals()[i.strip().split()[0]] = val.strip().strip('"')
+__license__ = __licence__
 
 README_rst = ''
 fndoc = os_path.join(os_path.dirname(__file__), 'README.rst')

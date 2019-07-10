@@ -10,7 +10,6 @@ import re
 import os
 import gzip
 from os import path
-from glob import glob
 import logging
 
 __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
@@ -59,8 +58,8 @@ def get_file(fname, origin, cache_dir=None):
     if not path.exists(cache_dir):
         try:
             os.makedirs(cache_dir)
-        except:
-            pass
+        except Exception:
+            log.warn("cannot create:" + cache_dir)
     if not os.access(cache_dir, os.W_OK):
         cache_dir = path.join('/tmp', '.brainweb')
         if not path.exists(cache_dir):
@@ -179,7 +178,9 @@ def volshow(vol,
         vol = [vol]
     else:
         for v in vol:
-            assert v.ndim in [3, 4], "Input should be (one or a list of) 3D and/or 4D array(s)"
+            if v.ndim not in [3, 4]:
+                raise IndexError("Input should be (one or a list of)" +
+                                 " 3D and/or 4D array(s)")
 
     if cmaps is None:
         cmaps = ["Greys_r"] * len(vol)
