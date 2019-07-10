@@ -103,12 +103,13 @@ load_file = functools.partial(
     gunzip_array, shape=(362, 434, 362), dtype=np.uint16)
 
 
-def get_files(cache_dir=None):
+def get_files(cache_dir=None, progress=True):
     """
     Returns list of files which can be `numpy.load`ed
     """
     files = []
-    for f, url in tqdm(LINKS.items(), unit="file", desc="BrainWeb Subjects"):
+    for f, url in tqdm(LINKS.items(), unit="file", desc="BrainWeb Subjects",
+                       disable=not progress):
         files.append(get_file(f, url, cache_dir=cache_dir))
     return sorted(files)
 
