@@ -25,10 +25,9 @@ exist.
 
   - ``~/.brainweb/subject_*.bin.gz``: dtype(shape): ``uint16(362, 434, 362)``
 
-- Prerequisites
+- Install
 
-  - Python: `requirements.txt <../../requirements.txt>`__ (e.g.
-       ``pip install -r ../../requirements.txt``)
+  - ``pip install brainweb``
 
 --------------
 
