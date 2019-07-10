@@ -77,7 +77,7 @@ Raw Data
 
     ~/.brainweb/subject_54.bin.gz
 
-.. image:: raw.png
+.. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/raw.png
 
 Transform
 ---------
@@ -119,7 +119,7 @@ Convert raw image data:
 
     ~/.brainweb/subject_54.bin.gz
 
-.. image:: mMR.png
+.. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/mMR.png
 
 .. code:: python
 
@@ -128,4 +128,4 @@ Convert raw image data:
     im3d = brainweb.add_lesions(vol['PET'])
     volshow(im3d[:, 100:-100, 100:-100], cmaps=['hot']);
 
-.. image:: lesions.png
+.. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/lesions.png
