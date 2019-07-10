@@ -10,7 +10,7 @@ The following example may be launched interactively via any of the following:
 BrainWeb-based multimodal models of 20 normal brains
 ====================================================
 
-|DOI| |PyPI| |Codacy| |LICENCE|
+|PyPI| |CI| |Quality| |DOI| |LICENCE|
 
 **Download and Preprocessing for PET-MR Simulations**
 
@@ -36,14 +36,16 @@ exist.
 - Date: 2017-19
 - Licence: `MPLv2.0 <https://www.mozilla.org/MPL/2.0>`__
 
+.. |PyPI| image:: https://img.shields.io/pypi/v/brainweb.svg
+   :target: https://pypi.org/project/brainweb
+.. |CI| image:: https://travis-ci.org/casperdcl/brainweb.svg?branch=master
+   :target: https://travis-ci.org/casperdcl/brainweb
+.. |Quality| image:: https://api.codacy.com/project/badge/Grade/cdad13693b0141199c31d5b44c7ab185
+   :target: https://www.codacy.com/app/casper-dcl/brainweb
 .. |DOI| image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3269888.svg
    :target: https://doi.org/10.5281/zenodo.3269888
-.. |PyPI| image:: https://img.shields.io/pypi/v/brainweb.svg?label=PyPI
-   :target: https://pypi.org/project/brainweb
-.. |LICENCE| image:: https://img.shields.io/pypi/l/brainweb.svg?label=Licence
+.. |LICENCE| image:: https://img.shields.io/pypi/l/brainweb.svg?label=licence
    :target: https://www.mozilla.org/MPL/2.0
-.. |Codacy| image:: https://api.codacy.com/project/badge/Grade/cdad13693b0141199c31d5b44c7ab185
-   :target: https://www.codacy.com/app/casper-dcl/brainweb
 
 .. code:: python
 
