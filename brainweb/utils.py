@@ -43,8 +43,9 @@ def get_file(fname, origin, cache_dir=None):
     Vaguely based on:
     https://github.com/keras-team/keras/blob/master/keras/utils/data_utils.py
 
-    @param fname  : Name of the file. If an absolute path `/path/to/file.txt` is
-        specified the file will be saved at that location.
+    @param fname  : Name of the file. If an absolute path
+        `/path/to/file.txt` is specified the file will be saved at that
+        location.
     @param origin  : Original URL of the file.
     @param cache_dir  : Location to store cached files, when None it
         defaults to `~/.brainweb`.
@@ -98,8 +99,8 @@ def gunzip_array(fpath, shape=None, dtype=None):
         return data.reshape(shape)
 
 
-load_file = functools.partial(gunzip_array,
-    shape=(362, 434, 362), dtype=np.uint16)
+load_file = functools.partial(
+    gunzip_array, shape=(362, 434, 362), dtype=np.uint16)
 
 
 def get_files(cache_dir=None):
@@ -125,7 +126,8 @@ def get_mmr(cache_file, raw_data,
         t1 = noise(t1, t1Noise, sigma=t1Sigma)[:, ::-1]
         t2 = noise(t2, t2Noise, sigma=t2Sigma)[:, ::-1]
         uMap = uMap[:, ::-1]
-        np.savez_compressed(cache_file,
+        np.savez_compressed(
+            cache_file,
             PET=pet, uMap=uMap, T1=t1, T2=t2,
             petNoise=np.float32(petNoise),
             t1Noise=np.float32(t1Noise),
@@ -141,8 +143,8 @@ def get_mmr_fromfile(brainweb_file,
                      petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
                      petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0):
     """
-    mMR resolution ground truths from a cached `np.load`able file generated from
-    `brainweb_file`.
+    mMR resolution ground truths from a cached `np.load`able file generated
+    from `brainweb_file`.
     """
     dat = load_file(brainweb_file)  # read raw data
     return get_mmr(brainweb_file.replace('.bin.gz', '.npz'), dat)
@@ -161,11 +163,13 @@ def volshow(vol,
       Note that imarray may be 3D (mono) or 4D (last channel rgb(a))
     @param cmaps  : list of cmap [default: ["Greys_r", ...]]
     @param xlabels, ylabels, titles  : list of strings (default blank)
-    @param sharex, sharey, ncols, nrows  : passed to `matplotlib.pyplot.subplots`
+    @param sharex, sharey, ncols, nrows  : passed to
+      `matplotlib.pyplot.subplots`
     @param figsize, frameon  : passed to `matplotlib.pyplot.figure`
     """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
+    log = logging.getLogger(__name__)
 
     if hasattr(vol, "keys") and hasattr(vol, "values"):
         if titles is not None:
@@ -213,7 +217,8 @@ def volshow(vol,
         plt.figure(fig.number, clear=True)
         axs = fig.subplots(rows, cols, sharex=sharex, sharey=sharey)
         axs = getattr(axs, 'flat', [axs])
-        for ax, v, cmap, cbar, xlab, ylab, tit in zip(axs, vol, cmaps, colorbars, xlabels, ylabels, titles):
+        for ax, v, cmap, cbar, xlab, ylab, tit in zip(
+                axs, vol, cmaps, colorbars, xlabels, ylabels, titles):
             plt.sca(ax)
             plt.imshow(v[z], cmap=cmap)
             if cbar:
@@ -391,14 +396,16 @@ def ellipsoid(out_shape, radii, position, dtype=np.float32):
     return (out <= 1).astype(dtype)
 
 
-def add_lesions(im3d, dim=Res.mMR * Shape.mMR, diam=None, intensity=None, blur=None, thresh=0.9 * Pet.whiteMatter):
+def add_lesions(im3d, dim=Res.mMR * Shape.mMR, diam=None, intensity=None,
+                blur=None, thresh=0.9 * Pet.whiteMatter):
     """
     im3d  : 3darray
     dim  : `im3d` dimensions [default: Res.mMR * Shape.mMR]mm
     diam  : [default: [15, 7, 8, 5]]
     intensity  : [default: [Pet.hot, -Pet.cold, Pet.hot, Pet.hot]]
     blur  : [default: [0, 2, 2.5, 0]]
-    thresh  : Minimum `im3d` value on which a tumour can be overlaid [default: 0.9 * Pet.whiteMatter]
+    thresh  : Minimum `im3d` value on which a tumour can be overlaid
+      [default: 0.9 * Pet.whiteMatter]
     """
     diam = diam or [15, 7, 8, 5]
     intensity = intensity or [Pet.hot, -Pet.cold, Pet.hot, Pet.hot]
@@ -425,10 +432,12 @@ def add_lesions(im3d, dim=Res.mMR * Shape.mMR, diam=None, intensity=None, blur=N
         ZYX = np.asarray(np.where(msk == quadrant + 1))
         position = ZYX[:, np.random.choice(ZYX.shape[1])]
         radii = d / (2 * dim) * im3d.shape
-        tumour = peak * ellipsoid(im3d.shape, radii, position, dtype=im3d.dtype)
+        tumour = peak * ellipsoid(
+            im3d.shape, radii, position, dtype=im3d.dtype)
         if fwhm:
             sigma = fwhm / (np.sqrt(8 * np.log(2)) * dim) * im3d.shape
-            tumour = gaussian_filter(tumour, sigma, mode='constant').astype(tumour.dtype)
+            tumour = gaussian_filter(tumour, sigma, mode='constant')
+            tumour = tumour.astype(tumour.dtype)
         if peak > 0:
             im3d = np.max([im3d, tumour], axis=0)
         else:

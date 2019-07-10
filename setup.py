@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-#import sys
 from os import path as os_path
 from io import open as io_open
 try:
@@ -14,7 +12,8 @@ __licence__ = None
 __version__ = None
 main_file = os_path.join(os_path.dirname(__file__), 'brainweb', '__init__.py')
 for l in io_open(main_file, mode='r'):
-    if any(l.startswith(i) for i in ('__author__', '__licence__', '__version__')):
+    if any(l.startswith(i) for i in
+           ['__author__', '__licence__', '__version__']):
         i, val = l.rsplit('=', 1)
         globals()[i.strip().split()[0]] = val.strip().strip('"')
 __license__ = __licence__
