@@ -154,6 +154,7 @@ def get_mmr_fromfile(brainweb_file,
 def volshow(vol,
             cmaps=None, colorbars=None,
             xlabels=None, ylabels=None, titles=None,
+            vmins=None, vmaxs=None,
             sharex=True, sharey=True,
             ncols=None, nrows=None,
             figsize=None, frameon=True):
@@ -164,6 +165,7 @@ def volshow(vol,
       Note that imarray may be 3D (mono) or 4D (last channel rgb(a))
     @param cmaps  : list of cmap [default: ["Greys_r", ...]]
     @param xlabels, ylabels, titles  : list of strings (default blank)
+    @param vmins, vmaxs  : list of numbers [default: None]
     @param sharex, sharey, ncols, nrows  : passed to
       `matplotlib.pyplot.subplots`
     @param figsize, frameon  : passed to `matplotlib.pyplot.figure`
@@ -197,6 +199,10 @@ def volshow(vol,
         ylabels = [""] * len(vol)
     if titles is None:
         titles = [""] * len(vol)
+    if vmins is None:
+        vmins = [""] * len(vol)
+    if vmaxs is None:
+        vmaxs = [""] * len(vol)
 
     # automatically square-ish grid, slightly favouring more rows
     if nrows:
@@ -218,10 +224,12 @@ def volshow(vol,
         plt.figure(fig.number, clear=True)
         axs = fig.subplots(rows, cols, sharex=sharex, sharey=sharey)
         axs = getattr(axs, 'flat', [axs])
-        for ax, v, cmap, cbar, xlab, ylab, tit in zip(
-                axs, vol, cmaps, colorbars, xlabels, ylabels, titles):
+        for ax, v, cmap, cbar, xlab, ylab, tit, vmin, vmax in zip(
+                axs, vol, cmaps, colorbars,
+                xlabels, ylabels, titles,
+                vmins, vmaxs):
             plt.sca(ax)
-            plt.imshow(v[z], cmap=cmap)
+            plt.imshow(v[z], cmap=cmap, vmin=vmin, vmax=vmax)
             if cbar:
                 plt.colorbar()
             if xlab:
