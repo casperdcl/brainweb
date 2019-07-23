@@ -157,7 +157,7 @@ def volshow(vol,
             vmins=None, vmaxs=None,
             sharex=True, sharey=True,
             ncols=None, nrows=None,
-            figsize=None, frameon=True):
+            figsize=None, frameon=True, tight_layout=True):
     """
     Interactively slice through 3D array(s) in Jupyter
 
@@ -170,6 +170,8 @@ def volshow(vol,
     @param sharex, sharey, ncols, nrows  : passed to
       `matplotlib.pyplot.subplots`
     @param figsize, frameon  : passed to `matplotlib.pyplot.figure`
+    @param tight_layout  : whether to run `tight_layout(0, 0, 0)`
+      [default: True]
     """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
@@ -240,7 +242,8 @@ def volshow(vol,
             if tit:
                 plt.title(tit)
             plt.show()
-        plt.tight_layout(0, 0, 0)
+        if tight_layout:
+            plt.tight_layout(0, 0, 0)
         #return fig, axs
 
     return plot_slice
