@@ -165,7 +165,8 @@ def volshow(vol,
       Note that imarray may be 3D (mono) or 4D (last channel rgb(a))
     @param cmaps  : list of cmap [default: ["Greys_r", ...]]
     @param xlabels, ylabels, titles  : list of strings (default blank)
-    @param vmins, vmaxs  : list of numbers [default: None]
+    @param vmins, vmaxs  : list of numbers [default: [None, ...]]
+    @param colorbars  : list of bool [default: [False, ...]]
     @param sharex, sharey, ncols, nrows  : passed to
       `matplotlib.pyplot.subplots`
     @param figsize, frameon  : passed to `matplotlib.pyplot.figure`
@@ -200,9 +201,9 @@ def volshow(vol,
     if titles is None:
         titles = [""] * len(vol)
     if vmins is None:
-        vmins = [""] * len(vol)
+        vmins = [None] * len(vol)
     if vmaxs is None:
-        vmaxs = [""] * len(vol)
+        vmaxs = [None] * len(vol)
 
     # automatically square-ish grid, slightly favouring more rows
     if nrows:
