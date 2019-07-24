@@ -241,6 +241,12 @@ def volshow(vol,
                 plt.ylabel(ylab)
             if tit:
                 plt.title(tit)
+            if not frameon:
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+                plt.tick_params(
+                    top='off', bottom='off', left='off', right='off',
+                    labelleft='off', labelbottom='off')
             plt.show()
         if tight_layout:
             plt.tight_layout(0, 0, 0)
