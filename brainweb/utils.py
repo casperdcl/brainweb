@@ -157,7 +157,8 @@ def volshow(vol,
             vmins=None, vmaxs=None,
             sharex=True, sharey=True,
             ncols=None, nrows=None,
-            figsize=None, frameon=True, tight_layout=True):
+            figsize=None, frameon=True, tight_layout=True,
+            fontproperties=None):
     """
     Interactively slice through 3D array(s) in Jupyter
 
@@ -235,19 +236,21 @@ def volshow(vol,
             plt.imshow(v[z], cmap=cmap, vmin=vmin, vmax=vmax)
             if cbar:
                 plt.colorbar()
+            textargs = {}
+            if fontproperties is not None:
+                textargs.update(fontproperties=fontproperties)
             if xlab:
-                plt.xlabel(xlab)
+                plt.xlabel(xlab, **textargs)
             if ylab:
-                plt.ylabel(ylab)
+                plt.ylabel(ylab, **textargs)
             if tit:
-                plt.title(tit)
-            if not frameon:
-                for spine in ax.spines.values():
-                    spine.set_visible(False)
-                plt.tick_params(
-                    top='off', bottom='off', left='off', right='off',
-                    labelleft='off', labelbottom='off')
+                plt.title(tit, **textargs)
             plt.show()
+            if not frameon:
+                plt.setp(ax.spines.values(), color='white')
+                #  don't need all axes if sharex=sharey=True
+                ax.set_xticks(())
+                ax.set_yticks(())
         if tight_layout:
             plt.tight_layout(0, 0, 0)
         #return fig, axs
