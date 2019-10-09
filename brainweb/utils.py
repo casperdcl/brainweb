@@ -157,7 +157,7 @@ def volshow(vol,
             vmins=None, vmaxs=None,
             sharex=True, sharey=True,
             ncols=None, nrows=None,
-            figsize=None, frameon=True, tight_layout=True,
+            figsize=None, frameon=True, tight_layout=1,
             fontproperties=None):
     """
     Interactively slice through 3D array(s) in Jupyter
@@ -171,8 +171,8 @@ def volshow(vol,
     @param sharex, sharey, ncols, nrows  : passed to
       `matplotlib.pyplot.subplots`
     @param figsize, frameon  : passed to `matplotlib.pyplot.figure`
-    @param tight_layout  : whether to run `tight_layout(0, 0, 0)`
-      [default: True]
+    @param tight_layout  : number of times to run `tight_layout(0, 0, 0)`
+      [default: 1]
     """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
@@ -207,6 +207,8 @@ def volshow(vol,
         vmins = [None] * len(vol)
     if vmaxs is None:
         vmaxs = [None] * len(vol)
+    if tight_layout in (True, False):
+        tight_layout = 1 if tight_layout else 0
 
     # automatically square-ish grid, slightly favouring more rows
     if nrows:
@@ -251,7 +253,7 @@ def volshow(vol,
                 #  don't need all axes if sharex=sharey=True
                 ax.set_xticks(())
                 ax.set_yticks(())
-        if tight_layout:
+        for _ in range(tight_layout):
             plt.tight_layout(0, 0, 0)
         #return fig, axs
 
