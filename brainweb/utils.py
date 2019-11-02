@@ -323,7 +323,7 @@ def volshow(vol,
         """z  : int, slice index"""
         plt.figure(fig.number, clear=True)
         axs = fig.subplots(rows, cols, sharex=sharex, sharey=sharey)
-        axs = getattr(axs, 'flat', [axs])
+        axs = list(getattr(axs, 'flat', [axs]))
         for ax, v, cmap, cbar, xlab, ylab, tit, vmin, vmax in zip(
                 axs, vol, cmaps, colorbars,
                 xlabels, ylabels, titles,
@@ -349,6 +349,9 @@ def volshow(vol,
                 ax.set_yticks(())
         for _ in range(tight_layout):
             plt.tight_layout(0, 0, 0)
+        # make sure to clear extra axes
+        for ax in axs[axs.index(ax) + 1:]:
+            ax.axis('off')
         #return fig, axs
 
     return plot_slice
