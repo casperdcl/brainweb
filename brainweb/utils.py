@@ -20,6 +20,10 @@ __all__ = [
     "volshow", "get_files", "get_mmr_fromfile",
     # useful utils
     "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions",
+    # intensities
+    "FDG", "Amyloid", "T1", "T2",
+    # scanner params
+    "Res",
     # probably not needed
     "noise", "seed", "toPetMmr", "LINKS"]
 
@@ -31,6 +35,87 @@ LINKS = [
     for i in LINKS.split()]
 RE_SUBJ = re.compile('.*(subject)([0-9]+).*')
 LINKS = dict((RE_SUBJ.sub(r'\1_\2.bin.gz', i), i) for i in LINKS)
+
+
+class Act(object):
+  """careful: occasionally other bits may be set"""
+  background, csf, greyMatter, whiteMatter, fat, muscle, skin, skull, vessels,\
+      aroundFat, dura, marrow\
+      = [i << 4 for i in range(12)]
+  bone = skull | marrow | dura
+
+  @classmethod
+  def indices(cls, im, attr):
+    if attr == "bone":
+      return (cls.indices(im, "skull") +
+              cls.indices(im, "marrow") +
+              cls.indices(im, "dura") > 0)
+    return abs(im - getattr(cls, attr)) < 1
+
+
+class FDG(Act):
+  whiteMatter = 32
+  greyMatter = whiteMatter * 4
+  skin = whiteMatter // 2
+  hot = greyMatter * 1.5
+  cold = whiteMatter * 0.5
+  attrs = ["whiteMatter", "greyMatter", "skin"]
+
+
+Pet = FDG  # backward-compat
+
+
+class Amyloid(Act):
+  whiteMatter = 29
+  greyMatter = 66
+  skin = 35
+  hot = greyMatter * 1.5
+  cold = whiteMatter * 0.5
+  attrs = ["whiteMatter", "greyMatter", "skin"]
+
+
+class T1(Act):
+  whiteMatter = 154
+  greyMatter = 106
+  skin = 92
+  skull = 48
+  marrow = 180
+  bone = 48
+  csf = 48
+  hot = greyMatter * 1.5
+  cold = whiteMatter * 0.8
+  attrs = ["whiteMatter", "greyMatter", "skin", "skull", "marrow", "bone",
+           "csf"]
+
+
+class T2(T1):
+  whiteMatter = 70
+  greyMatter = 100
+  skin = 70
+  skull = 100
+  marrow = 250
+  csf = 250
+  bone = 200
+  hot = greyMatter * 1.5
+  cold = whiteMatter * 0.8
+
+
+mu_bone_1_cm = 0.13
+mu_tissue_1_cm = 0.0975
+
+
+class Res(object):
+  """in mm"""
+  mMR = np.array([2.0312, 2.0863, 2.0863])
+  MR = np.array([1.0, 1.0, 1.0])
+  brainweb = np.array([0.5, 0.5, 0.5])
+
+
+class Shape(object):
+  """in voxels"""
+  mMR = np.array([127, 344, 344])
+  MR = mMR * Res.mMR / Res.MR
+  brainweb = mMR * Res.mMR / Res.brainweb
 
 
 def get_file(fname, origin, cache_dir=None):
@@ -116,13 +201,14 @@ def get_files(cache_dir=None, progress=True):
 
 def get_mmr(cache_file, raw_data,
             petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
-            petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0):
+            petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
+            PetClass=FDG):
     """
     Return contents of specified `*.npz` file,
     creating it from BrainWeb `raw_data` 3darray if it doesn't exist.
     """
     if not path.exists(cache_file):
-        pet, uMap, t1, t2 = toPetMmr(raw_data)
+        pet, uMap, t1, t2 = toPetMmr(raw_data, PetClass=PetClass)
         pet = noise(pet, petNoise, sigma=petSigma)[:, ::-1]
         t1 = noise(t1, t1Noise, sigma=t1Sigma)[:, ::-1]
         t2 = noise(t2, t2Noise, sigma=t2Sigma)[:, ::-1]
@@ -142,13 +228,21 @@ def get_mmr(cache_file, raw_data,
 
 def get_mmr_fromfile(brainweb_file,
                      petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
-                     petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0):
+                     petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
+                     PetClass=FDG):
     """
     mMR resolution ground truths from a cached `np.load`able file generated
     from `brainweb_file`.
     """
     dat = load_file(brainweb_file)  # read raw data
-    return get_mmr(brainweb_file.replace('.bin.gz', '.npz'), dat)
+    return get_mmr(
+        brainweb_file.replace(
+            '.bin.gz', '.npz' if PetClass == FDG else
+            '.{}.npz'.format(PetClass.__name__)),
+        dat,
+        petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
+        petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
+        PetClass=PetClass)
 
 
 def volshow(vol,
@@ -229,7 +323,7 @@ def volshow(vol,
         """z  : int, slice index"""
         plt.figure(fig.number, clear=True)
         axs = fig.subplots(rows, cols, sharex=sharex, sharey=sharey)
-        axs = getattr(axs, 'flat', [axs])
+        axs = list(getattr(axs, 'flat', [axs]))
         for ax, v, cmap, cbar, xlab, ylab, tit, vmin, vmax in zip(
                 axs, vol, cmaps, colorbars,
                 xlabels, ylabels, titles,
@@ -255,78 +349,12 @@ def volshow(vol,
                 ax.set_yticks(())
         for _ in range(tight_layout):
             plt.tight_layout(0, 0, 0)
+        # make sure to clear extra axes
+        for ax in axs[axs.index(ax) + 1:]:
+            ax.axis('off')
         #return fig, axs
 
     return plot_slice
-
-
-class Act(object):
-  """careful: occasionally other bits may be set"""
-  background, csf, greyMatter, whiteMatter, fat, muscle, skin, skull, vessels,\
-      aroundFat, dura, marrow\
-      = [i << 4 for i in range(12)]
-  bone = skull | marrow | dura
-
-  @classmethod
-  def indices(cls, im, attr):
-    if attr == "bone":
-      return (cls.indices(im, "skull") +
-              cls.indices(im, "marrow") +
-              cls.indices(im, "dura") > 0)
-    return abs(im - getattr(cls, attr)) < 1
-
-
-class Pet(Act):
-  whiteMatter = 32
-  greyMatter = whiteMatter * 4
-  skin = whiteMatter // 2
-  hot = greyMatter * 1.5
-  cold = whiteMatter * 0.5
-  attrs = ["whiteMatter", "greyMatter", "skin"]
-
-
-class T1(Act):
-  whiteMatter = 154
-  greyMatter = 106
-  skin = 92
-  skull = 48
-  marrow = 180
-  bone = 48
-  csf = 48
-  hot = greyMatter * 1.5
-  cold = whiteMatter * 0.8
-  attrs = ["whiteMatter", "greyMatter", "skin", "skull", "marrow", "bone",
-           "csf"]
-
-
-class T2(T1):
-  whiteMatter = 70
-  greyMatter = 100
-  skin = 70
-  skull = 100
-  marrow = 250
-  csf = 250
-  bone = 200
-  hot = greyMatter * 1.5
-  cold = whiteMatter * 0.8
-
-
-mu_bone_1_cm = 0.13
-mu_tissue_1_cm = 0.0975
-
-
-class Res(object):
-  """in mm"""
-  mMR = np.array([2.0312, 2.0863, 2.0863])
-  MR = np.array([1.0, 1.0, 1.0])
-  brainweb = np.array([0.5, 0.5, 0.5])
-
-
-class Shape(object):
-  """in voxels"""
-  mMR = np.array([127, 344, 344])
-  MR = mMR * Res.mMR / Res.MR
-  brainweb = mMR * Res.mMR / Res.brainweb
 
 
 def getRaw(fname):
@@ -351,7 +379,7 @@ def noise(im, n, warn_zero=True, sigma=1):
   return im * (1 + n * (2 * r - 1))
 
 
-def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR"):
+def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", PetClass=FDG):
   """
   @return out  : [[PET, uMap, T1, T2], 127, 344, 344]
   """
@@ -363,9 +391,9 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR"):
   # PET
   # res = np.zeros(im.shape, dtype=dtype)
   res = np.zeros_like(im)
-  for attr in Pet.attrs:
-    log.debug("PET:%s:%d" % (attr, getattr(Pet, attr)))
-    res[Act.indices(im, attr)] = getattr(Pet, attr)
+  for attr in PetClass.attrs:
+    log.debug("PET:%s:%d" % (attr, getattr(PetClass, attr)))
+    res[Act.indices(im, attr)] = getattr(PetClass, attr)
 
   # muMap
   muMap = np.zeros(im.shape, dtype=dtype)
@@ -421,18 +449,22 @@ def ellipsoid(out_shape, radii, position, dtype=np.float32):
 
 
 def add_lesions(im3d, dim=Res.mMR * Shape.mMR, diam=None, intensity=None,
-                blur=None, thresh=0.9 * Pet.whiteMatter):
+                blur=None, thresh=None, PetClass=FDG):
     """
     im3d  : 3darray
     dim  : `im3d` dimensions [default: Res.mMR * Shape.mMR]mm
     diam  : [default: [15, 7, 8, 5]]
-    intensity  : [default: [Pet.hot, -Pet.cold, Pet.hot, Pet.hot]]
+    intensity  : [default: [
+        PetClass.hot, -PetClass.cold, PetClass.hot, PetClass.hot]]
     blur  : [default: [0, 2, 2.5, 0]]
     thresh  : Minimum `im3d` value on which a tumour can be overlaid
-      [default: 0.9 * Pet.whiteMatter]
+      [default: 0.9 * PetClass.whiteMatter]
     """
     diam = diam or [15, 7, 8, 5]
-    intensity = intensity or [Pet.hot, -Pet.cold, Pet.hot, Pet.hot]
+    if thresh is None:
+        thresh = 0.9 * PetClass.whiteMatter
+    if intensity is None:
+        intensity = [PetClass.hot, -PetClass.cold, PetClass.hot, PetClass.hot]
     blur = blur or [0, 2, 2.5, 0]
 
     rad = max(diam) / (2 * dim) * im3d.shape
