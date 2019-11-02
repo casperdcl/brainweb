@@ -102,7 +102,8 @@ Convert raw image data:
         vol = brainweb.get_mmr_fromfile(
             f,
             petNoise=1, t1Noise=0.75, t2Noise=0.75,
-            petSigma=1, t1Sigma=1, t2Sigma=1)
+            petSigma=1, t1Sigma=1, t2Sigma=1,
+            PetClass=brainweb.FDG)
 
 .. code:: python
 
