@@ -1,3 +1,4 @@
+"""General helper functions."""
 from __future__ import division
 import numpy as np
 from numpy.random import seed
@@ -13,17 +14,19 @@ from os import path
 import logging
 
 __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
-__date__ = "2017-19"
+__date__ = "2017-20"
 __licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
 __all__ = [
     # necessary
     "volshow", "get_files", "get_mmr_fromfile",
     # useful utils
     "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions",
+    # nothing to do with BrainWeb but still useful
+    "register",
     # intensities
     "FDG", "Amyloid", "T1", "T2",
     # scanner params
-    "Res",
+    "Res", "Shape",
     # probably not needed
     "noise", "seed", "toPetMmr", "LINKS"]
 
@@ -529,3 +532,76 @@ def matify(mat, dtype=np.float32, transpose=None):
   if transpose is None:
     transpose = tuple(range(mat.ndim)[::-1])
   return mat.transpose(transpose).astype(dtype)
+
+
+def register(src, target=None, ROI=None, target_shape=Shape.mMR,
+             src_resolution=Res.MR, target_resolution=Res.mMR,
+             src_offset=None, dtype=np.float32):
+    """
+    Transforms `src` into `target` space.
+
+    @param src  : ndarray. Volume to transform.
+    @param target  : ndarray, optional.
+      If (default: None), perform a basic transform using the other params.
+      If ndarray, use as reference static image for registration.
+    @param ROI  : tuple, optional.
+      Ignored if `target` is unspecified.
+      Region within `target` to use for registration.
+      [default: ((0, None),)] for whole volume. Use e.g.:
+      ((0, None), (100, -120), (110, -110)) to mean [0:, 100:-120, 110:-110].
+    @param target_shape  : tuple, optional.
+      Ignored if `target` is specified.
+    @param src_offset  : tuple, optional.
+      Static initial translation [default: (0, 0, 0)].
+      Useful when no `target` is specified.
+    """
+    from dipy.align.imaffine import AffineMap, transform_centers_of_mass
+    log = logging.getLogger(__name__)
+
+    assert src.ndim == 3
+    if target is not None:
+        assert target.ndim == 3
+    assert len(target_shape) == 3
+    assert len(src_resolution) == 3
+    assert len(target_resolution) == 3
+
+    if ROI is None:
+        ROI = ((0, None),)
+    ROI = tuple(slice(i, j) for i, j in ROI)
+    if src_offset is None:
+        src_offset = (0, 0, 0)
+
+    moving = src
+    # scale
+    affine_init = np.diag((src_resolution / target_resolution).tolist() + [1])
+    # centre offset
+    affine_init[:3, -1] = target.shape if target is not None else target_shape
+    affine_init[:3, -1] -= moving.shape * src_resolution / target_resolution
+    affine_init[:3, -1] /= 2
+    affine_init[:3, -1] += src_offset
+    affine_map = AffineMap(
+        np.eye(4),
+        target_shape, np.eye(4),  # unmoved target
+        moving.shape, affine_init)
+    src = affine_map.transform(moving)
+
+    if target is not None:
+        static = target
+        if np.isnan(static).sum():
+            log.warn("NaNs in target reference - skipping")
+        else:
+            # remove noise outside ROI
+            msk = np.zeros_like(static)
+            msk[ROI] = 1
+            msk = affine_map.transform_inverse(msk)
+            moving[msk == 0] = 0
+
+            c_of_mass = transform_centers_of_mass(
+                static, np.eye(4), moving, affine_init
+            )
+            c_of_mass.affine[0, -1] = 0  # manually specify no z-trans
+            src = c_of_mass.transform(moving)
+
+    if dtype is not None:
+        src = src.astype(dtype)
+    return src
