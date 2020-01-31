@@ -46,10 +46,17 @@ class Act(object):
 
   @classmethod
   def indices(cls, im, attr):
+    matter = None
     if attr == "bone":
-      return (cls.indices(im, "skull") +
-              cls.indices(im, "marrow") +
-              cls.indices(im, "dura") > 0)
+      matter = ["skull", "marrow", "dura"]
+    elif attr == "tissue":
+      matter = ["whiteMatter", "greyMatter", "skin", "csf", "fat", "muscle",
+                "vessels", "aroundFat"]
+
+    if matter:
+      return sum((cls.indices(im, i) for i in matter[1:]),
+                 cls.indices(im, matter[0])) > 0
+
     return abs(im - getattr(cls, attr)) < 1
 
 
@@ -100,8 +107,14 @@ class T2(T1):
   cold = whiteMatter * 0.8
 
 
-mu_bone_1_cm = 0.13
-mu_tissue_1_cm = 0.0975
+class Mu(Act):
+  bone = 0.13
+  tissue = 0.0975
+  attrs = ["bone", "tissue"]
+
+
+mu_bone_1_cm = Mu.bone  # backward-compat
+mu_tissue_1_cm = Mu.tissue  # backward-compat
 
 
 class Res(object):
@@ -379,14 +392,19 @@ def noise(im, n, warn_zero=True, sigma=1):
   return im * (1 + n * (2 * r - 1))
 
 
-def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", PetClass=FDG):
+def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
+    PetClass=FDG):
   """
-  @return out  : [[PET, uMap, T1, T2], 127, 344, 344]
+  @param modes  : [default: [PetClass, Mu, T1, T2]]
+  @return out  : list of `modes`, each shape [127, 344, 344]
   """
   log = logging.getLogger(__name__)
 
   out_res = getattr(Res, outres)
   out_shape = getattr(Shape, outres)
+
+  if modes is None:
+    modes = [PetClass, Mu, T1, T2]
 
   # PET
   # res = np.zeros(im.shape, dtype=dtype)
@@ -395,10 +413,11 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", PetClass=FDG):
     log.debug("PET:%s:%d" % (attr, getattr(PetClass, attr)))
     res[Act.indices(im, attr)] = getattr(PetClass, attr)
 
-  # muMap
-  muMap = np.zeros(im.shape, dtype=dtype)
-  muMap[im != 0] = mu_tissue_1_cm
-  muMap[Act.indices(im, 'bone')] = mu_bone_1_cm
+  # uMap
+  uMap = np.zeros(im.shape, dtype=dtype)
+  for attr in Mu.attrs:
+    log.debug("uMap:%s:%d" % (attr, getattr(Mu, attr)))
+    res[Act.indices(im, attr)] = getattr(Mu, attr)
 
   # MR
   # t1 = np.zeros(im.shape, dtype=dtype)
@@ -429,7 +448,7 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", PetClass=FDG):
                    mode="constant")
     return arr
 
-  return [resizeToMmr(i) for i in [res, muMap, t1, t2]]
+  return [resizeToMmr(i) for i in [res, uMap, t1, t2]]
 
 
 def ellipsoid(out_shape, radii, position, dtype=np.float32):
