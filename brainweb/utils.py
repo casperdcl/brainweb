@@ -536,6 +536,7 @@ def matify(mat, dtype=np.float32, transpose=None):
 
 def register(src, target=None, ROI=None, target_shape=Shape.mMR,
              src_resolution=Res.MR, target_resolution=Res.mMR,
+             method="CoM",
              src_offset=None, dtype=np.float32):
     """
     Transforms `src` into `target` space.
@@ -554,6 +555,8 @@ def register(src, target=None, ROI=None, target_shape=Shape.mMR,
     @param src_offset  : tuple, optional.
       Static initial translation [default: (0, 0, 0)].
       Useful when no `target` is specified.
+    @param method  : str, optional.
+      [default: "CoM"]  : centre of mass.
     """
     from dipy.align.imaffine import AffineMap, transform_centers_of_mass
     log = logging.getLogger(__name__)
@@ -570,6 +573,7 @@ def register(src, target=None, ROI=None, target_shape=Shape.mMR,
     ROI = tuple(slice(i, j) for i, j in ROI)
     if src_offset is None:
         src_offset = (0, 0, 0)
+    method = method.lower()
 
     moving = src
     # scale
@@ -594,13 +598,16 @@ def register(src, target=None, ROI=None, target_shape=Shape.mMR,
             msk = np.zeros_like(static)
             msk[ROI] = 1
             msk = affine_map.transform_inverse(msk)
+            moving = np.array(moving)
             moving[msk == 0] = 0
 
-            c_of_mass = transform_centers_of_mass(
-                static, np.eye(4), moving, affine_init
-            )
-            c_of_mass.affine[0, -1] = 0  # manually specify no z-trans
-            src = c_of_mass.transform(moving)
+            if method == "com":
+                method = transform_centers_of_mass(
+                    static, np.eye(4), moving, affine_init
+                )
+            else:
+                raise KeyError("Unknown method:" + method)
+            src = method.transform(moving)
 
     if dtype is not None:
         src = src.astype(dtype)
