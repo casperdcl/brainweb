@@ -293,7 +293,7 @@ def volshow(vol,
             log.warn("ignoring `vol.keys()` in favour of specified `titles`")
         else:
             titles = vol.keys()
-            vol = vol.values()
+            vol = list(vol.values())
 
     if vol[0].ndim == 2:  # single 3darray
         vol = [vol]
