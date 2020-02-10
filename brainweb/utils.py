@@ -1,3 +1,4 @@
+"""General helper functions."""
 from __future__ import division
 import numpy as np
 from numpy.random import seed
@@ -13,17 +14,19 @@ from os import path
 import logging
 
 __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
-__date__ = "2017-19"
+__date__ = "2017-20"
 __licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
 __all__ = [
     # necessary
     "volshow", "get_files", "get_mmr_fromfile",
     # useful utils
     "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions",
+    # nothing to do with BrainWeb but still useful
+    "register",
     # intensities
     "FDG", "Amyloid", "T1", "T2",
     # scanner params
-    "Res",
+    "Res", "Shape",
     # probably not needed
     "noise", "seed", "toPetMmr", "LINKS"]
 
@@ -46,10 +49,17 @@ class Act(object):
 
   @classmethod
   def indices(cls, im, attr):
+    matter = None
     if attr == "bone":
-      return (cls.indices(im, "skull") +
-              cls.indices(im, "marrow") +
-              cls.indices(im, "dura") > 0)
+      matter = ["skull", "marrow", "dura"]
+    elif attr == "tissue":
+      matter = ["whiteMatter", "greyMatter", "skin", "csf", "fat", "muscle",
+                "vessels", "aroundFat"]
+
+    if matter:
+      return sum((cls.indices(im, i) for i in matter[1:]),
+                 cls.indices(im, matter[0])) > 0
+
     return abs(im - getattr(cls, attr)) < 1
 
 
@@ -100,8 +110,14 @@ class T2(T1):
   cold = whiteMatter * 0.8
 
 
-mu_bone_1_cm = 0.13
-mu_tissue_1_cm = 0.0975
+class Mu(Act):
+  bone = 0.13
+  tissue = 0.0975
+  attrs = ["bone", "tissue"]
+
+
+mu_bone_1_cm = Mu.bone  # backward-compat
+mu_tissue_1_cm = Mu.tissue  # backward-compat
 
 
 class Res(object):
@@ -277,7 +293,7 @@ def volshow(vol,
             log.warn("ignoring `vol.keys()` in favour of specified `titles`")
         else:
             titles = vol.keys()
-            vol = vol.values()
+            vol = list(vol.values())
 
     if vol[0].ndim == 2:  # single 3darray
         vol = [vol]
@@ -379,14 +395,19 @@ def noise(im, n, warn_zero=True, sigma=1):
   return im * (1 + n * (2 * r - 1))
 
 
-def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", PetClass=FDG):
+def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
+    PetClass=FDG):
   """
-  @return out  : [[PET, uMap, T1, T2], 127, 344, 344]
+  @param modes  : [default: [PetClass, Mu, T1, T2]]
+  @return out  : list of `modes`, each shape [127, 344, 344]
   """
   log = logging.getLogger(__name__)
 
   out_res = getattr(Res, outres)
   out_shape = getattr(Shape, outres)
+
+  if modes is None:
+    modes = [PetClass, Mu, T1, T2]
 
   # PET
   # res = np.zeros(im.shape, dtype=dtype)
@@ -395,10 +416,11 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", PetClass=FDG):
     log.debug("PET:%s:%d" % (attr, getattr(PetClass, attr)))
     res[Act.indices(im, attr)] = getattr(PetClass, attr)
 
-  # muMap
-  muMap = np.zeros(im.shape, dtype=dtype)
-  muMap[im != 0] = mu_tissue_1_cm
-  muMap[Act.indices(im, 'bone')] = mu_bone_1_cm
+  # uMap
+  uMap = np.zeros(im.shape, dtype=dtype)
+  for attr in Mu.attrs:
+    log.debug("uMap:%s:%d" % (attr, getattr(Mu, attr)))
+    res[Act.indices(im, attr)] = getattr(Mu, attr)
 
   # MR
   # t1 = np.zeros(im.shape, dtype=dtype)
@@ -429,7 +451,7 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", PetClass=FDG):
                    mode="constant")
     return arr
 
-  return [resizeToMmr(i) for i in [res, muMap, t1, t2]]
+  return [resizeToMmr(i) for i in [res, uMap, t1, t2]]
 
 
 def ellipsoid(out_shape, radii, position, dtype=np.float32):
@@ -510,3 +532,83 @@ def matify(mat, dtype=np.float32, transpose=None):
   if transpose is None:
     transpose = tuple(range(mat.ndim)[::-1])
   return mat.transpose(transpose).astype(dtype)
+
+
+def register(src, target=None, ROI=None, target_shape=Shape.mMR,
+             src_resolution=Res.MR, target_resolution=Res.mMR,
+             method="CoM",
+             src_offset=None, dtype=np.float32):
+    """
+    Transforms `src` into `target` space.
+
+    @param src  : ndarray. Volume to transform.
+    @param target  : ndarray, optional.
+      If (default: None), perform a basic transform using the other params.
+      If ndarray, use as reference static image for registration.
+    @param ROI  : tuple, optional.
+      Ignored if `target` is unspecified.
+      Region within `target` to use for registration.
+      [default: ((0, None),)] for whole volume. Use e.g.:
+      ((0, None), (100, -120), (110, -110)) to mean [0:, 100:-120, 110:-110].
+    @param target_shape  : tuple, optional.
+      Ignored if `target` is specified.
+    @param src_offset  : tuple, optional.
+      Static initial translation [default: (0, 0, 0)].
+      Useful when no `target` is specified.
+    @param method  : str, optional.
+      [default: "CoM"]  : centre of mass.
+    """
+    from dipy.align.imaffine import AffineMap, transform_centers_of_mass
+    log = logging.getLogger(__name__)
+
+    assert src.ndim == 3
+    if target is not None:
+        assert target.ndim == 3
+    assert len(target_shape) == 3
+    assert len(src_resolution) == 3
+    assert len(target_resolution) == 3
+
+    if ROI is None:
+        ROI = ((0, None),)
+    ROI = tuple(slice(i, j) for i, j in ROI)
+    if src_offset is None:
+        src_offset = (0, 0, 0)
+    method = method.lower()
+
+    moving = src
+    # scale
+    affine_init = np.diag((src_resolution / target_resolution).tolist() + [1])
+    # centre offset
+    affine_init[:3, -1] = target.shape if target is not None else target_shape
+    affine_init[:3, -1] -= moving.shape * src_resolution / target_resolution
+    affine_init[:3, -1] /= 2
+    affine_init[:3, -1] += src_offset
+    affine_map = AffineMap(
+        np.eye(4),
+        target_shape, np.eye(4),  # unmoved target
+        moving.shape, affine_init)
+    src = affine_map.transform(moving)
+
+    if target is not None:
+        static = target
+        if np.isnan(static).sum():
+            log.warn("NaNs in target reference - skipping")
+        else:
+            # remove noise outside ROI
+            msk = np.zeros_like(static)
+            msk[ROI] = 1
+            msk = affine_map.transform_inverse(msk)
+            moving = np.array(moving)
+            moving[msk == 0] = 0
+
+            if method == "com":
+                method = transform_centers_of_mass(
+                    static, np.eye(4), moving, affine_init
+                )
+            else:
+                raise KeyError("Unknown method:" + method)
+            src = method.transform(moving)
+
+    if dtype is not None:
+        src = src.astype(dtype)
+    return src
