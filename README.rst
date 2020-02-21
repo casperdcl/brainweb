@@ -157,4 +157,6 @@ Convert raw image data:
         "PET":    vol['PET'][:, 100:-100, 100:-100],
         "RawReg": reg[       :, 100:-100, 100:-100],
         "T1":     vol['T1' ][:, 100:-100, 100:-100],
-    }, ncols=3, tight_layout=5, figsize=(9.5, 3.5), frameon=False);
+    }, cmaps=['hot', 'gist_ncar', 'Greys_r'], ncols=3, tight_layout=5, figsize=(9.5, 3.5), frameon=False);
+
+.. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/reg.png
