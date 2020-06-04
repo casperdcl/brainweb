@@ -1,0 +1,18 @@
+name: Test
+on:
+- push
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [2.7, 3.7]
+    name: Check py${{ matrix.python }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python }}
+    - run: pip install .[test]
+    - run: python setup.py check -mrs
+    - run: flake8 --exit-zero
