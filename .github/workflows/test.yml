@@ -17,6 +17,8 @@ jobs:
     - run: python setup.py check -mrs
     - run: flake8 --extend-ignore=E265
   deploy:
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
+    needs: check
     name: PyPI Deploy
     runs-on: ubuntu-latest
     steps:
@@ -26,4 +28,3 @@ jobs:
            password: ${{ secrets.pypi_token }}
            build: true
            gpg_key: ${{ secrets.gpg_key }}
-           skip_existing: true
