@@ -1,0 +1,30 @@
+name: Test
+on:
+- push
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [2.7, 3.7]
+    name: Check py${{ matrix.python }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python }}
+    - run: pip install .[test]
+    - run: python setup.py check -mrs
+    - run: flake8 --extend-ignore=E265
+  deploy:
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
+    needs: check
+    name: PyPI Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: casperdcl/deploy-pypi@v1
+        with:
+           password: ${{ secrets.pypi_token }}
+           build: true
+           gpg_key: ${{ secrets.gpg_key }}

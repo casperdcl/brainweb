@@ -396,7 +396,7 @@ def noise(im, n, warn_zero=True, sigma=1):
 
 
 def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
-    PetClass=FDG):
+             PetClass=FDG):
   """
   @param modes  : [default: [PetClass, Mu, T1, T2]]
   @return out  : list of `modes`, each shape [127, 344, 344]
