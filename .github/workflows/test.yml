@@ -16,3 +16,14 @@ jobs:
     - run: pip install .[test]
     - run: python setup.py check -mrs
     - run: flake8 --extend-ignore=E265
+  deploy:
+    name: PyPI Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: casperdcl/deploy-pypi@v1
+        with:
+           password: ${{ secrets.pypi_token }}
+           build: true
+           gpg_key: ${{ secrets.gpg_key }}
+           skip_existing: true
