@@ -15,4 +15,4 @@ jobs:
         python-version: ${{ matrix.python }}
     - run: pip install .[test]
     - run: python setup.py check -mrs
-    - run: flake8 --exit-zero
+    - run: flake8 --extend-ignore=E265
