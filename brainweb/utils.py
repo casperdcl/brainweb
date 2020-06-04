@@ -420,7 +420,7 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
   uMap = np.zeros(im.shape, dtype=dtype)
   for attr in Mu.attrs:
     log.debug("uMap:%s:%d" % (attr, getattr(Mu, attr)))
-    res[Act.indices(im, attr)] = getattr(Mu, attr)
+    uMap[Act.indices(im, attr)] = getattr(Mu, attr)
 
   # MR
   # t1 = np.zeros(im.shape, dtype=dtype)

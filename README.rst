@@ -10,6 +10,16 @@ The following example may be launched interactively via any of the following:
 BrainWeb-based multimodal models of 20 normal brains
 ====================================================
 
+This project was initially inspired by "`BrainWeb: 20 Anatomical Models
+of 20 Normal
+Brains <http://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html>`__."
+
+However there are a number of generally useful tools, image processing &
+display functions included in this project. For example, this includes
+``volshow()`` for interactive comparison of multiple 3D volumes,
+``get_file()`` for caching data URLs, and ``register()`` for image
+coregistration.
+
 |PyPI| |CI| |Quality| |DOI| |LICENCE|
 
 **Download and Preprocessing for PET-MR Simulations**
@@ -17,23 +27,26 @@ BrainWeb-based multimodal models of 20 normal brains
 This notebook will not re-download/re-process files if they already
 exist.
 
-- Output data
+-  Output data
 
-  - ``~/.brainweb/subject_*.npz``: dtype(shape): ``float32(127, 344, 344)``
+   -  ``~/.brainweb/subject_*.npz``: dtype(shape):
+      ``float32(127, 344, 344)``
 
-- `Raw data source <http://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html>`__
+-  `Raw data
+   source <http://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html>`__
 
-  - ``~/.brainweb/subject_*.bin.gz``: dtype(shape): ``uint16(362, 434, 362)``
+   -  ``~/.brainweb/subject_*.bin.gz``: dtype(shape):
+      ``uint16(362, 434, 362)``
 
-- Install
+-  Install
 
-  - ``pip install brainweb``
+   -  ``pip install brainweb``
 
 --------------
 
-- Author: Casper da Costa-Luis <casper.dcl@physics.org>
-- Date: 2017-19
-- Licence: `MPLv2.0 <https://www.mozilla.org/MPL/2.0>`__
+-  Author: Casper da Costa-Luis <casper.dcl@physics.org>
+-  Date: 2017-2020
+-  Licence: `MPLv2.0 <https://www.mozilla.org/MPL/2.0>`__
 
 .. |PyPI| image:: https://img.shields.io/pypi/v/brainweb.svg
    :target: https://pypi.org/project/brainweb
@@ -130,3 +143,20 @@ Convert raw image data:
     volshow(im3d[:, 100:-100, 100:-100], cmaps=['hot']);
 
 .. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/lesions.png
+
+.. code:: python
+
+    # bonus: use brute-force registration to transform
+    #!pip install -U 'brainweb[register]'
+    reg = brainweb.register(
+        data[:, ::-1], target=vol['PET'],
+        src_resolution=brainweb.Res.brainweb,
+        target_resolution=brainweb.Res.mMR)
+
+    volshow({
+        "PET":    vol['PET'][:, 100:-100, 100:-100],
+        "RawReg": reg[       :, 100:-100, 100:-100],
+        "T1":     vol['T1' ][:, 100:-100, 100:-100],
+    }, cmaps=['hot', 'gist_ncar', 'Greys_r'], ncols=3, tight_layout=5, figsize=(9.5, 3.5), frameon=False);
+
+.. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/reg.png
