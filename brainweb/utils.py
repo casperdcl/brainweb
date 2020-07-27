@@ -218,17 +218,21 @@ def get_files(cache_dir=None, progress=True):
 def get_mmr(cache_file, raw_data,
             petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
             petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
-            PetClass=FDG):
+            outres="mMR", PetClass=FDG):
     """
     Return contents of specified `*.npz` file,
     creating it from BrainWeb `raw_data` 3darray if it doesn't exist.
+
+    @param outres: attribute to use from Res/Class [default: "mMR"]
     """
     if not path.exists(cache_file):
-        pet, uMap, t1, t2 = toPetMmr(raw_data, PetClass=PetClass)
+        pet, uMap, t1, t2 = toPetMmr(raw_data, outres=outres, PetClass=PetClass)
         pet = noise(pet, petNoise, sigma=petSigma)[:, ::-1]
         t1 = noise(t1, t1Noise, sigma=t1Sigma)[:, ::-1]
         t2 = noise(t2, t2Noise, sigma=t2Sigma)[:, ::-1]
         uMap = uMap[:, ::-1]
+        out_res = getattr(Res, outres)
+
         np.savez_compressed(
             cache_file,
             PET=pet, uMap=uMap, T1=t1, T2=t2,
@@ -237,28 +241,38 @@ def get_mmr(cache_file, raw_data,
             t2Noise=np.float32(t2Noise),
             petSigma=np.float32(petSigma),
             t1Sigma=np.float32(t1Sigma),
-            t2Sigma=np.float32(t2Sigma))
+            t2Sigma=np.float32(t2Sigma),
+            res=np.float32(out_res))
 
-    return np.load(cache_file, allow_pickle=True)
+    cached= np.load(cache_file, allow_pickle=True)
+    # handle case of cached file that didn't stored the res key yet 
+    if not 'res' in cached:
+        # need to add it, but cannot do that directly to a npzfile
+        # so create a dict (trick from https://stackoverflow.com/a/46550796)
+        cached = dict(cached)
+        cached['res'] = getattr(Res, 'mMR')
 
+    return cached
 
 def get_mmr_fromfile(brainweb_file,
                      petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
                      petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
-                     PetClass=FDG):
+                     outres="mMR", PetClass=FDG):
     """
-    mMR resolution ground truths from a cached `np.load`able file generated
+    ground truths from a cached `np.load`able file generated
     from `brainweb_file`.
+
+    @param outres: attribute to use from Res/Class [default: "mMR"]
     """
     dat = load_file(brainweb_file)  # read raw data
     return get_mmr(
         brainweb_file.replace(
-            '.bin.gz', '.npz' if PetClass == FDG else
-            '.{}.npz'.format(PetClass.__name__)),
+            '.bin.gz', '.npz' if PetClass == FDG and outres=="mMR" else
+            '.{}.{}.npz'.format(PetClass.__name__, outres)),
         dat,
         petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
         petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
-        PetClass=PetClass)
+        outres=outres, PetClass=PetClass)
 
 
 def volshow(vol,
@@ -398,8 +412,9 @@ def noise(im, n, warn_zero=True, sigma=1):
 def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
              PetClass=FDG):
   """
+  @param outres: attribute to use from Res/Class [default: "mMR"]
   @param modes  : [default: [PetClass, Mu, T1, T2]]
-  @return out  : list of `modes`, each shape [127, 344, 344]
+  @return out  : list of `modes`, each res/shape specified from the outres attribute of Res/Shape
   """
   log = logging.getLogger(__name__)
 
