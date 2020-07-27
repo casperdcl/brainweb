@@ -256,8 +256,8 @@ def get_mmr_fromfile(brainweb_file,
             '.bin.gz', '.npz' if PetClass == FDG else
             '.{}.npz'.format(PetClass.__name__)),
         dat,
-        petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
-        petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
+        petNoise=petNoise, t1Noise=t1Noise, t2Noise=t2Noise,
+        petSigma=petSigma, t1Sigma=t1Sigma, t2Sigma=t2Sigma,
         PetClass=PetClass)
 
 
