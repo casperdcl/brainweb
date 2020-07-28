@@ -99,6 +99,7 @@ Convert raw image data:
 
 -  Siemens Biograph mMR resolution (~2mm) & dimensions (127, 344, 344)
 -  PET/T1/T2/uMap intensities
+-  PET given with FDG intensity ratios
 -  randomised structure for PET/T1/T2
 -  t (1 + g [2 G_sigma(r) - 1]), where
 
@@ -111,12 +112,14 @@ Convert raw image data:
 
     brainweb.seed(1337)
 
+    PetClass = brainweb.FDG
+
     for f in tqdm(files, desc="mMR ground truths", unit="subject"):
         vol = brainweb.get_mmr_fromfile(
             f,
             petNoise=1, t1Noise=0.75, t2Noise=0.75,
             petSigma=1, t1Sigma=1, t2Sigma=1,
-            PetClass=brainweb.FDG)
+            PetClass=PetClass)
 
 .. code:: python
 
@@ -136,6 +139,12 @@ Convert raw image data:
 .. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/mMR.png
 
 .. code:: python
+
+    # get a 4D array with weights for each region for the last subject
+    label_probs = brainweb.get_label_probabilities(files[-1])
+    # print their names
+    print(PetClass.all_labels)
+
 
     # add some lesions
     brainweb.seed(1337)

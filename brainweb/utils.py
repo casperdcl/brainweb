@@ -20,11 +20,11 @@ __all__ = [
     # necessary
     "volshow", "get_files", "get_mmr_fromfile",
     # useful utils
-    "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions",
+    "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions", "get_label_probabilities",
     # nothing to do with BrainWeb but still useful
     "register",
     # intensities
-    "FDG", "Amyloid", "T1", "T2",
+    "FDG", "Amyloid", "T1", "T2", "Mu",
     # scanner params
     "Res", "Shape",
     # probably not needed
@@ -46,6 +46,9 @@ class Act(object):
       aroundFat, dura, marrow\
       = [i << 4 for i in range(12)]
   bone = skull | marrow | dura
+
+  all_labels = ['background', 'csf', 'greyMatter', 'whiteMatter', 'fat', 'muscle', 'skin', 'skull', 'vessels',\
+                 'aroundFat', 'dura', 'marrow']
 
   @classmethod
   def indices(cls, im, attr):
@@ -274,6 +277,32 @@ def get_mmr_fromfile(brainweb_file,
         petSigma=petSigma, t1Sigma=t1Sigma, t2Sigma=t2Sigma,
         outres=outres, PetClass=PetClass)
 
+
+def get_label_probabilities(brainweb_file, outres="mMR", progress=True):
+    """
+    @return a 4D array with the masks resampled to the `outres` shape and resolution. This is useful for PVC.
+    """
+    log = logging.getLogger(__name__)
+
+    out_res = getattr(Res, outres)
+    out_shape = getattr(Shape, outres)
+
+    raw_data = load_file(brainweb_file)  # read raw data
+
+    num_classes = len(Act.all_labels)
+    res = np.zeros((num_classes,) + tuple(out_shape), dtype='float32')
+    for i in tqdm(range(num_classes), unit="label", desc="BrainWeb labels",
+                       disable=not progress):
+        attr = Act.all_labels[i]
+        # create a class derived from Act
+        one_class = type("class_" + attr, (Act,), {})
+        # add just one attribute for the current label
+        one_class.attrs = [attr]
+        setattr(one_class, attr, 1)
+        # compute image
+        res[i,:,:,:] = toPetMmr(raw_data, outres=outres, PetClass=one_class)[0]
+
+    return res
 
 def volshow(vol,
             cmaps=None, colorbars=None,
