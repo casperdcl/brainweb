@@ -24,7 +24,7 @@ __all__ = [
     # nothing to do with BrainWeb but still useful
     "register",
     # intensities
-    "FDG", "Amyloid", "T1", "T2", "Mu",
+    "Act", "FDG", "Amyloid", "T1", "T2", "Mu",
     # scanner params
     "Res", "Shape",
     # probably not needed
