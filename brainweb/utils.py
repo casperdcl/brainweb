@@ -364,7 +364,7 @@ def volshow(vol,
                 ax.set_xticks(())
                 ax.set_yticks(())
         for _ in range(tight_layout):
-            plt.tight_layout(0, 0, 0)
+            plt.tight_layout(pad=0, h_pad=0, w_pad=0)
         # make sure to clear extra axes
         for ax in axs[axs.index(ax) + 1:]:
             ax.axis('off')
