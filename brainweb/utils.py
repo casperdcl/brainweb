@@ -5,6 +5,7 @@ from numpy.random import seed
 from skimage.transform import resize
 from scipy.ndimage.filters import gaussian_filter
 from tqdm.auto import tqdm, trange
+from tqdm.contrib import tenumerate
 import functools
 import requests
 import re
@@ -38,6 +39,7 @@ LINKS = [
     for i in LINKS.split()]
 RE_SUBJ = re.compile('.*(subject)([0-9]+).*')
 LINKS = dict((RE_SUBJ.sub(r'\1_\2.bin.gz', i), i) for i in LINKS)
+log = logging.getLogger(__name__)
 
 
 class Act(object):
@@ -155,8 +157,6 @@ def get_file(fname, origin, cache_dir=None):
         defaults to `~/.brainweb`.
     @return  : Path to the downloaded file
     """
-    log = logging.getLogger(__name__)
-
     if cache_dir is None:
         cache_dir = path.join('~', '.brainweb')
     cache_dir = path.expanduser(cache_dir)
@@ -247,8 +247,8 @@ def get_mmr(cache_file, raw_data,
             t2Sigma=np.float32(t2Sigma),
             res=np.float32(out_res))
 
-    cached= np.load(cache_file, allow_pickle=True)
-    # handle case of cached file that didn't stored the res key yet 
+    cached = np.load(cache_file, allow_pickle=True)
+    # handle case of cached file that didn't stored the res key yet
     if not 'res' in cached:
         # need to add it, but cannot do that directly to a npzfile
         # so create a dict (trick from https://stackoverflow.com/a/46550796)
@@ -278,31 +278,31 @@ def get_mmr_fromfile(brainweb_file,
         outres=outres, PetClass=PetClass)
 
 
-def get_label_probabilities(brainweb_file, outres="mMR", progress=True):
+def get_label_probabilities(brainweb_file, labels=None, outres="mMR", progress=True, dtype=np.float32):
     """
-    @return a 4D array with the masks resampled to the `outres` shape and resolution. This is useful for PVC.
+    @param labels  : list of strings, [default: Act.all_labels]
+    @return out  : 4D array of masks resampled as per `outres` (useful for PVC)
     """
-    log = logging.getLogger(__name__)
-
-    out_res = getattr(Res, outres)
     out_shape = getattr(Shape, outres)
+    raw_data = load_file(brainweb_file)
+    if labels is None:
+        labels = Act.all_labels
+    if set(labels).difference(Act.all_labels):
+        raise KeyError(
+            "labels (%s) must be in Act.all_labels (%s)" % (
+                ", ".join(labels), ", ".join(Act.all_labels)))
 
-    raw_data = load_file(brainweb_file)  # read raw data
-
-    num_classes = len(Act.all_labels)
-    res = np.zeros((num_classes,) + tuple(out_shape), dtype='float32')
-    for i in tqdm(range(num_classes), unit="label", desc="BrainWeb labels",
-                       disable=not progress):
-        attr = Act.all_labels[i]
-        # create a class derived from Act
-        one_class = type("class_" + attr, (Act,), {})
-        # add just one attribute for the current label
-        one_class.attrs = [attr]
-        setattr(one_class, attr, 1)
-        # compute image
-        res[i,:,:,:] = toPetMmr(raw_data, outres=outres, PetClass=one_class)[0]
+    num_classes = len(labels)
+    res = np.zeros((num_classes,) + tuple(out_shape), dtype=dtype)
+    for i, attr in tenumerate(labels, unit="label", desc="BrainWeb labels",
+                              disable=not progress):
+        class MAct(Act):
+          attrs = [attr]
+        setattr(MAct, attr, 1)
+        res[i] = toPetMmr(raw_data, outres=outres, modes=[MAct])[0][:, ::-1]
 
     return res
+
 
 def volshow(vol,
             cmaps=None, colorbars=None,
@@ -329,7 +329,6 @@ def volshow(vol,
     """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
-    log = logging.getLogger(__name__)
 
     if hasattr(vol, "keys") and hasattr(vol, "values"):
         if titles is not None:
@@ -427,7 +426,6 @@ def noise(im, n, warn_zero=True, sigma=1):
   @param sigma  : float, smoothing of noise component
   @return[out] im  : array like im with +-n *100%im noise added
   """
-  log = logging.getLogger(__name__)
   if n < 0:
     raise ValueError("Noise must be positive")
   elif n == 0:
@@ -441,25 +439,18 @@ def noise(im, n, warn_zero=True, sigma=1):
 def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
              PetClass=FDG):
   """
-  @param outres: attribute to use from Res/Class [default: "mMR"]
+  @param outres: attribute to use from `Res` & `Shape` classes [default: "mMR"]
   @param modes  : [default: [PetClass, Mu, T1, T2]]
-  @return out  : list of `modes`, each res/shape specified from the outres attribute of Res/Shape
+  @param PetClass  : [default: FDG]. Ignored if `modes` is explicitly specified
+  @return out  : 4D array with same length as `modes`
   """
-  log = logging.getLogger(__name__)
-
+  if modes is None:
+    modes = [PetClass, Mu, T1, T2]
   out_res = getattr(Res, outres)
   out_shape = getattr(Shape, outres)
 
   new_shape = np.rint(np.asarray(im.shape) * Res.brainweb / out_res)
   padLR, padR = divmod((np.array(out_shape) - new_shape), 2)
-
-  def getModeIms(modes):
-    for MClass in modes:
-      res = np.zeros_like(im, dtype=dtype)  # dtype only needed for uMap?
-      for attr in MClass.attrs:
-        log.debug("%s:%s:%d" % (MClass.__name__, attr, getattr(MClass, attr)))
-        res[Act.indices(im, attr)] = getattr(MClass, attr)
-      yield res
 
   def resizeToMmr(arr):
     # oldMax = arr.max()
@@ -474,8 +465,15 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
                    mode="constant")
     return arr
 
-  return list(
-      map(resizeToMmr, map(getModeIms, modes or [PetClass, Mu, T1, T2])))
+  res = np.zeros((len(modes),) + tuple(out_shape))
+  for i, MClass in enumerate(modes):
+    arr = np.zeros_like(im, dtype=dtype)  # dtype only needed for uMap?
+    for attr in MClass.attrs:
+      log.debug("%s:%s:%d" % (MClass.__name__, attr, getattr(MClass, attr)))
+      arr[Act.indices(im, attr)] = getattr(MClass, attr)
+    res[i] = resizeToMmr(arr)
+
+  return res
 
 
 def ellipsoid(out_shape, radii, position, dtype=np.float32):
@@ -608,7 +606,6 @@ def register(src, target=None, ROI=None, target_shape=Shape.mMR,
       [default: "CoM"]  : centre of mass.
     """
     from dipy.align.imaffine import AffineMap, transform_centers_of_mass
-    log = logging.getLogger(__name__)
 
     assert src.ndim == 3
     if target is not None:
