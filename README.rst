@@ -151,13 +151,6 @@ Convert raw image data:
 
 .. code:: python
 
-    # get a 4D array with weights for each region for the last subject
-    label_probs = brainweb.get_label_probabilities(files[-1])
-    # print their names
-    print(PetClass.all_labels)
-
-.. code:: python
-
     # add some lesions
     brainweb.seed(1337)
     im3d = brainweb.add_lesions(vol['PET'])
