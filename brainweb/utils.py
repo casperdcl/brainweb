@@ -4,7 +4,8 @@ import numpy as np
 from numpy.random import seed
 from skimage.transform import resize
 from scipy.ndimage.filters import gaussian_filter
-from tqdm.auto import tqdm
+from tqdm.auto import tqdm, trange
+from tqdm.contrib import tenumerate
 import functools
 import requests
 import re
@@ -21,10 +22,11 @@ __all__ = [
     "volshow", "get_files", "get_mmr_fromfile",
     # useful utils
     "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions",
+    "get_label_probabilities",
     # nothing to do with BrainWeb but still useful
-    "register",
+    "trim_zeros_ROI", "register",
     # intensities
-    "FDG", "Amyloid", "T1", "T2",
+    "Act", "FDG", "Amyloid", "T1", "T2", "Mu",
     # scanner params
     "Res", "Shape",
     # probably not needed
@@ -38,6 +40,7 @@ LINKS = [
     for i in LINKS.split()]
 RE_SUBJ = re.compile('.*(subject)([0-9]+).*')
 LINKS = dict((RE_SUBJ.sub(r'\1_\2.bin.gz', i), i) for i in LINKS)
+log = logging.getLogger(__name__)
 
 
 class Act(object):
@@ -45,6 +48,9 @@ class Act(object):
   background, csf, greyMatter, whiteMatter, fat, muscle, skin, skull, vessels,\
       aroundFat, dura, marrow\
       = [i << 4 for i in range(12)]
+  all_labels = [
+      'background', 'csf', 'greyMatter', 'whiteMatter', 'fat', 'muscle', 'skin',
+      'skull', 'vessels', 'aroundFat', 'dura', 'marrow']
   bone = skull | marrow | dura
 
   @classmethod
@@ -152,8 +158,6 @@ def get_file(fname, origin, cache_dir=None):
         defaults to `~/.brainweb`.
     @return  : Path to the downloaded file
     """
-    log = logging.getLogger(__name__)
-
     if cache_dir is None:
         cache_dir = path.join('~', '.brainweb')
     cache_dir = path.expanduser(cache_dir)
@@ -218,17 +222,21 @@ def get_files(cache_dir=None, progress=True):
 def get_mmr(cache_file, raw_data,
             petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
             petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
-            PetClass=FDG):
+            outres="mMR", PetClass=FDG):
     """
     Return contents of specified `*.npz` file,
     creating it from BrainWeb `raw_data` 3darray if it doesn't exist.
+
+    @param outres: attribute to use from Res/Class [default: "mMR"]
     """
     if not path.exists(cache_file):
-        pet, uMap, t1, t2 = toPetMmr(raw_data, PetClass=PetClass)
+        pet, uMap, t1, t2 = toPetMmr(raw_data, outres=outres, PetClass=PetClass)
         pet = noise(pet, petNoise, sigma=petSigma)[:, ::-1]
         t1 = noise(t1, t1Noise, sigma=t1Sigma)[:, ::-1]
         t2 = noise(t2, t2Noise, sigma=t2Sigma)[:, ::-1]
         uMap = uMap[:, ::-1]
+        out_res = getattr(Res, outres)
+
         np.savez_compressed(
             cache_file,
             PET=pet, uMap=uMap, T1=t1, T2=t2,
@@ -237,28 +245,66 @@ def get_mmr(cache_file, raw_data,
             t2Noise=np.float32(t2Noise),
             petSigma=np.float32(petSigma),
             t1Sigma=np.float32(t1Sigma),
-            t2Sigma=np.float32(t2Sigma))
+            t2Sigma=np.float32(t2Sigma),
+            res=np.float32(out_res))
 
-    return np.load(cache_file, allow_pickle=True)
+    cached = np.load(cache_file, allow_pickle=True)
+    if 'res' not in cached:
+        log.info("%s:converting old data format", cache_file)
+        data = dict(cached)
+        data['res'] = getattr(Res, 'mMR')
+        np.savez_compressed(cache_file, **data)
+        cached = np.load(cache_file, allow_pickle=True)
+
+    return cached
 
 
 def get_mmr_fromfile(brainweb_file,
                      petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
                      petSigma=1.0, t1Sigma=1.0, t2Sigma=1.0,
-                     PetClass=FDG):
+                     outres="mMR", PetClass=FDG):
     """
-    mMR resolution ground truths from a cached `np.load`able file generated
+    ground truths from a cached `np.load`able file generated
     from `brainweb_file`.
+
+    @param outres: attribute to use from Res/Class [default: "mMR"]
     """
     dat = load_file(brainweb_file)  # read raw data
     return get_mmr(
         brainweb_file.replace(
-            '.bin.gz', '.npz' if PetClass == FDG else
-            '.{}.npz'.format(PetClass.__name__)),
+            '.bin.gz', ('.%s.%s.npz' % (PetClass.__name__, outres)).replace(
+                '.FDG.mMR', '')),
         dat,
         petNoise=petNoise, t1Noise=t1Noise, t2Noise=t2Noise,
         petSigma=petSigma, t1Sigma=t1Sigma, t2Sigma=t2Sigma,
-        PetClass=PetClass)
+        outres=outres, PetClass=PetClass)
+
+
+def get_label_probabilities(brainweb_file, labels=None, outres="mMR",
+                            progress=True, dtype=np.float32):
+    """
+    @param labels  : list of strings, [default: Act.all_labels]
+    @return out  : 4D array of masks resampled as per `outres` (useful for PVC)
+    """
+    out_shape = getattr(Shape, outres)
+    raw_data = load_file(brainweb_file)
+    if labels is None:
+        labels = Act.all_labels
+    if set(labels).difference(Act.all_labels):
+        raise KeyError(
+            "labels (%s) must be in Act.all_labels (%s)" % (
+                ", ".join(labels), ", ".join(Act.all_labels)))
+
+    num_classes = len(labels)
+    res = np.zeros((num_classes,) + tuple(out_shape), dtype=dtype)
+    for i, attr in tenumerate(labels, unit="label", desc="BrainWeb labels",
+                              disable=not progress):
+        class MAct(Act):
+          attrs = [attr]
+        setattr(MAct, attr, 1)
+        res[i] = toPetMmr(raw_data, outres=outres, modes=[MAct])[0][:, ::-1]
+
+    return res
 
 
 def volshow(vol,
@@ -286,7 +332,6 @@ def volshow(vol,
     """
     import matplotlib.pyplot as plt
     import ipywidgets as ipyw
-    log = logging.getLogger(__name__)
 
     if hasattr(vol, "keys") and hasattr(vol, "values"):
         if titles is not None:
@@ -384,7 +429,6 @@ def noise(im, n, warn_zero=True, sigma=1):
   @param sigma  : float, smoothing of noise component
   @return[out] im  : array like im with +-n *100%im noise added
   """
-  log = logging.getLogger(__name__)
   if n < 0:
     raise ValueError("Noise must be positive")
   elif n == 0:
@@ -398,24 +442,18 @@ def noise(im, n, warn_zero=True, sigma=1):
 def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
              PetClass=FDG):
   """
+  @param outres: attribute to use from `Res` & `Shape` classes [default: "mMR"]
   @param modes  : [default: [PetClass, Mu, T1, T2]]
-  @return out  : list of `modes`, each shape [127, 344, 344]
+  @param PetClass  : [default: FDG]. Ignored if `modes` is explicitly specified
+  @return out  : 4D array with same length as `modes`
   """
-  log = logging.getLogger(__name__)
-
+  if modes is None:
+    modes = [PetClass, Mu, T1, T2]
   out_res = getattr(Res, outres)
   out_shape = getattr(Shape, outres)
 
   new_shape = np.rint(np.asarray(im.shape) * Res.brainweb / out_res)
   padLR, padR = divmod((np.array(out_shape) - new_shape), 2)
-
-  def getModeIms(modes):
-    for MClass in modes:
-      res = np.zeros_like(im, dtype=dtype)  # dtype only needed for uMap?
-      for attr in MClass.attrs:
-        log.debug("%s:%s:%d" % (MClass.__name__, attr, getattr(MClass, attr)))
-        res[Act.indices(im, attr)] = getattr(MClass, attr)
-      yield res
 
   def resizeToMmr(arr):
     # oldMax = arr.max()
@@ -430,8 +468,15 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
                    mode="constant")
     return arr
 
-  return list(
-      map(resizeToMmr, map(getModeIms, modes or [PetClass, Mu, T1, T2])))
+  res = np.zeros((len(modes),) + tuple(out_shape))
+  for i, MClass in enumerate(modes):
+    arr = np.zeros_like(im, dtype=dtype)  # dtype only needed for uMap?
+    for attr in MClass.attrs:
+      log.debug("%s:%s:%d" % (MClass.__name__, attr, getattr(MClass, attr)))
+      arr[Act.indices(im, attr)] = getattr(MClass, attr)
+    res[i] = resizeToMmr(arr)
+
+  return res
 
 
 def ellipsoid(out_shape, radii, position, dtype=np.float32):
@@ -514,6 +559,31 @@ def matify(mat, dtype=np.float32, transpose=None):
   return mat.transpose(transpose).astype(dtype)
 
 
+def trim_zeros_ROI(arr, trim='fb', progress=True):
+  """Returns a ROI corresponding to `numpy.trim_zeros`. Works on ndarrays."""
+  trim = trim.upper()
+  res = []
+  for i in trange(arr.ndim, desc="Trimming ROI",
+                  disable=not progress, leave=False):
+    filt = np.swapaxes(arr, i, 0) if i else arr
+    first = 0
+    if 'F' in trim:
+      for i in filt:
+        if i.any():
+          break
+        else:
+          first += 1
+    last = len(filt)
+    if 'B' in trim:
+      for i in filt[::-1]:
+        if i.any():
+          break
+        else:
+          last -= 1
+    res.append(slice(first, last))
+  return tuple(res)
+
+
 def register(src, target=None, ROI=None, target_shape=Shape.mMR,
              src_resolution=Res.MR, target_resolution=Res.mMR,
              method="CoM",
@@ -539,7 +609,6 @@ def register(src, target=None, ROI=None, target_shape=Shape.mMR,
       [default: "CoM"]  : centre of mass.
     """
     from dipy.align.imaffine import AffineMap, transform_centers_of_mass
-    log = logging.getLogger(__name__)
 
     assert src.ndim == 3
     if target is not None:

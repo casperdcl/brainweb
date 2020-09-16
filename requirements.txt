@@ -1,4 +1,4 @@
-tqdm
+tqdm>=4.42.0
 requests
 numpy
 scikit-image
