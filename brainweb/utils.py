@@ -32,8 +32,8 @@ __all__ = [
 
 LINKS = "04 05 06 18 20 38 41 42 43 44 45 46 47 48 49 50 51 52 53 54"
 LINKS = [
-    'http://brainweb.bic.mni.mcgill.ca/cgi/brainweb1' +
-    '?do_download_alias=subject' + i + '_crisp&format_value=raw_short' +
+    'http://brainweb.bic.mni.mcgill.ca/cgi/brainweb1'
+    '?do_download_alias=subject' + i + '_crisp&format_value=raw_short'
     '&zip_value=gnuzip&download_for_real=%5BStart+download%21%5D'
     for i in LINKS.split()]
 RE_SUBJ = re.compile('.*(subject)([0-9]+).*')
@@ -300,7 +300,7 @@ def volshow(vol,
     else:
         for v in vol:
             if v.ndim not in [3, 4]:
-                raise IndexError("Input should be (one or a list of)" +
+                raise IndexError("Input should be (one or a list of)"
                                  " 3D and/or 4D array(s)")
 
     if cmaps is None:
