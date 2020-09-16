@@ -406,37 +406,16 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
   out_res = getattr(Res, outres)
   out_shape = getattr(Shape, outres)
 
-  if modes is None:
-    modes = [PetClass, Mu, T1, T2]
-
-  # PET
-  # res = np.zeros(im.shape, dtype=dtype)
-  res = np.zeros_like(im)
-  for attr in PetClass.attrs:
-    log.debug("PET:%s:%d" % (attr, getattr(PetClass, attr)))
-    res[Act.indices(im, attr)] = getattr(PetClass, attr)
-
-  # uMap
-  uMap = np.zeros(im.shape, dtype=dtype)
-  for attr in Mu.attrs:
-    log.debug("uMap:%s:%d" % (attr, getattr(Mu, attr)))
-    uMap[Act.indices(im, attr)] = getattr(Mu, attr)
-
-  # MR
-  # t1 = np.zeros(im.shape, dtype=dtype)
-  t1 = np.zeros_like(im)
-  for attr in T1.attrs:
-    log.debug("T1:%s:%d" % (attr, getattr(T1, attr)))
-    t1[Act.indices(im, attr)] = getattr(T1, attr)
-  # t2 = np.zeros(im.shape, dtype=dtype)
-  t2 = np.zeros_like(im)
-  for attr in T2.attrs:
-    log.debug("T2:%s:%d" % (attr, getattr(T2, attr)))
-    t2[Act.indices(im, attr)] = getattr(T2, attr)
-
-  # resize
   new_shape = np.rint(np.asarray(im.shape) * Res.brainweb / out_res)
   padLR, padR = divmod((np.array(out_shape) - new_shape), 2)
+
+  def getModeIms(modes):
+    for MClass in modes:
+      res = np.zeros_like(im, dtype=dtype)  # dtype only needed for uMap?
+      for attr in MClass.attrs:
+        log.debug("%s:%s:%d" % (MClass.__name__, attr, getattr(MClass, attr)))
+        res[Act.indices(im, attr)] = getattr(MClass, attr)
+      yield res
 
   def resizeToMmr(arr):
     # oldMax = arr.max()
@@ -451,7 +430,8 @@ def toPetMmr(im, pad=True, dtype=np.float32, outres="mMR", modes=None,
                    mode="constant")
     return arr
 
-  return [resizeToMmr(i) for i in [res, uMap, t1, t2]]
+  return list(
+      map(resizeToMmr, map(getModeIms, modes or [PetClass, Mu, T1, T2])))
 
 
 def ellipsoid(out_shape, radii, position, dtype=np.float32):
