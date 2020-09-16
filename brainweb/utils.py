@@ -21,7 +21,8 @@ __all__ = [
     # necessary
     "volshow", "get_files", "get_mmr_fromfile",
     # useful utils
-    "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions", "get_label_probabilities",
+    "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions",
+    "get_label_probabilities",
     # nothing to do with BrainWeb but still useful
     "trim_zeros_ROI", "register",
     # intensities
@@ -47,10 +48,10 @@ class Act(object):
   background, csf, greyMatter, whiteMatter, fat, muscle, skin, skull, vessels,\
       aroundFat, dura, marrow\
       = [i << 4 for i in range(12)]
+  all_labels = [
+      'background', 'csf', 'greyMatter', 'whiteMatter', 'fat', 'muscle', 'skin',
+      'skull', 'vessels', 'aroundFat', 'dura', 'marrow']
   bone = skull | marrow | dura
-
-  all_labels = ['background', 'csf', 'greyMatter', 'whiteMatter', 'fat', 'muscle', 'skin', 'skull', 'vessels',\
-                 'aroundFat', 'dura', 'marrow']
 
   @classmethod
   def indices(cls, im, attr):
@@ -248,14 +249,15 @@ def get_mmr(cache_file, raw_data,
             res=np.float32(out_res))
 
     cached = np.load(cache_file, allow_pickle=True)
-    # handle case of cached file that didn't stored the res key yet
-    if not 'res' in cached:
-        # need to add it, but cannot do that directly to a npzfile
-        # so create a dict (trick from https://stackoverflow.com/a/46550796)
-        cached = dict(cached)
-        cached['res'] = getattr(Res, 'mMR')
+    if 'res' not in cached:
+        log.info("%s:converting old data format", cache_file)
+        data = dict(cached)
+        data['res'] = getattr(Res, 'mMR')
+        np.savez_compressed(cache_file, **data)
+        cached = np.load(cache_file, allow_pickle=True)
 
     return cached
+
 
 def get_mmr_fromfile(brainweb_file,
                      petNoise=1.0, t1Noise=0.75, t2Noise=0.75,
@@ -270,15 +272,16 @@ def get_mmr_fromfile(brainweb_file,
     dat = load_file(brainweb_file)  # read raw data
     return get_mmr(
         brainweb_file.replace(
-            '.bin.gz', '.npz' if PetClass == FDG and outres=="mMR" else
-            '.{}.{}.npz'.format(PetClass.__name__, outres)),
+            '.bin.gz', ('.%s.%s.npz' % (PetClass.__name__, outres)).replace(
+                '.FDG.mMR', '')),
         dat,
         petNoise=petNoise, t1Noise=t1Noise, t2Noise=t2Noise,
         petSigma=petSigma, t1Sigma=t1Sigma, t2Sigma=t2Sigma,
         outres=outres, PetClass=PetClass)
 
 
-def get_label_probabilities(brainweb_file, labels=None, outres="mMR", progress=True, dtype=np.float32):
+def get_label_probabilities(brainweb_file, labels=None, outres="mMR",
+                            progress=True, dtype=np.float32):
     """
     @param labels  : list of strings, [default: Act.all_labels]
     @return out  : 4D array of masks resampled as per `outres` (useful for PVC)
