@@ -4,7 +4,7 @@ import numpy as np
 from numpy.random import seed
 from skimage.transform import resize
 from scipy.ndimage.filters import gaussian_filter
-from tqdm.auto import tqdm
+from tqdm.auto import tqdm, trange
 import functools
 import requests
 import re
@@ -22,7 +22,7 @@ __all__ = [
     # useful utils
     "get_file", "load_file", "gunzip_array", "ellipsoid", "add_lesions", "get_label_probabilities",
     # nothing to do with BrainWeb but still useful
-    "register",
+    "trim_zeros_ROI", "register",
     # intensities
     "Act", "FDG", "Amyloid", "T1", "T2", "Mu",
     # scanner params
@@ -556,6 +556,31 @@ def matify(mat, dtype=np.float32, transpose=None):
   if transpose is None:
     transpose = tuple(range(mat.ndim)[::-1])
   return mat.transpose(transpose).astype(dtype)
+
+
+def trim_zeros_ROI(arr, trim='fb', progress=True):
+  """Returns a ROI corresponding to `numpy.trim_zeros`. Works on ndarrays."""
+  trim = trim.upper()
+  res = []
+  for i in trange(arr.ndim, desc="Trimming ROI",
+                  disable=not progress, leave=False):
+    filt = np.swapaxes(arr, i, 0) if i else arr
+    first = 0
+    if 'F' in trim:
+      for i in filt:
+        if i.any():
+          break
+        else:
+          first += 1
+    last = len(filt)
+    if 'B' in trim:
+      for i in filt[::-1]:
+        if i.any():
+          break
+        else:
+          last -= 1
+    res.append(slice(first, last))
+  return tuple(res)
 
 
 def register(src, target=None, ROI=None, target_shape=Shape.mMR,

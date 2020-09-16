@@ -99,20 +99,30 @@ Convert raw image data:
 
 -  Siemens Biograph mMR resolution (~2mm) & dimensions (127, 344, 344)
 -  PET/T1/T2/uMap intensities
--  PET given with FDG intensity ratios
--  randomised structure for PET/T1/T2
--  t (1 + g [2 G_sigma(r) - 1]), where
 
-   -  r = rand(127, 344, 344) in [0, 1),
-   -  Gaussian smoothing sigma = 1,
-   -  g = 1 for PET; 0.75 for MR, and
-   -  t = the PET or MR piecewise constant phantom
+   -  PET defaults to FDG intensity ratios; could use e.g. Amyloid instead
+
+-  randomised structure for PET/T1/T2
+
+   -  t (1 + g [2 G_sigma(r) - 1]), where
+
+      -  r = rand(127, 344, 344) in [0, 1),
+      -  Gaussian smoothing sigma = 1,
+      -  g = 1 for PET; 0.75 for MR, and
+      -  t = the PET or MR piecewise constant phantom
+
+.. code:: python
+
+    # show region probability masks
+    PetClass = brainweb.FDG
+    label_probs = brainweb.get_label_probabilities(files[-1], labels=PetClass.all_labels)
+    volshow(label_probs[brainweb.trim_zeros_ROI(label_probs)], titles=PetClass.all_labels, frameon=False);
+
+.. image:: https://raw.githubusercontent.com/casperdcl/brainweb/master/pmasks.png
 
 .. code:: python
 
     brainweb.seed(1337)
-
-    PetClass = brainweb.FDG
 
     for f in tqdm(files, desc="mMR ground truths", unit="subject"):
         vol = brainweb.get_mmr_fromfile(
@@ -130,7 +140,8 @@ Convert raw image data:
              vol['T1'  ][:, 100:-100, 100:-100],
              vol['T2'  ][:, 100:-100, 100:-100]],
             cmaps=['hot', 'bone', 'Greys_r', 'Greys_r'],
-            titles=["PET", "uMap", "T1", "T2"]);
+            titles=["PET", "uMap", "T1", "T2"],
+            frameon=False);
 
 ::
 
@@ -145,6 +156,7 @@ Convert raw image data:
     # print their names
     print(PetClass.all_labels)
 
+.. code:: python
 
     # add some lesions
     brainweb.seed(1337)
