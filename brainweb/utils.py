@@ -331,8 +331,9 @@ def volshow(vol,
     @param tight_layout  : number of times to run `tight_layout(0, 0, 0)`
       [default: 1]
     """
-    import matplotlib.pyplot as plt
+    from IPython.display import display
     import ipywidgets as ipyw
+    import matplotlib.pyplot as plt
 
     if hasattr(vol, "keys") and hasattr(vol, "values"):
         if titles is not None:
@@ -378,7 +379,13 @@ def volshow(vol,
         nrows = ncols = 2
 
     zSize = min(len(i) for i in vol)
-    fig = plt.figure(figsize=figsize, frameon=frameon)
+
+    # matplotlib>=3.3.2 figure updating needs its own output area
+    # https://github.com/matplotlib/matplotlib/issues/18638
+    out = ipyw.Output()
+    display(out)
+    with out:
+        fig = plt.figure(figsize=figsize, frameon=frameon)
 
     @ipyw.interact(z=ipyw.IntSlider(zSize // 2, 0, zSize - 1, 1))
     def plot_slice(z):
