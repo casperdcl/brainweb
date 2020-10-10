@@ -140,7 +140,7 @@ class Shape(object):
   brainweb = mMR * Res.mMR / Res.brainweb
 
 
-def get_file(fname, origin, cache_dir=None):
+def get_file(fname, origin, cache_dir=None, chunk_size=None):
     """
     Downloads a file from a URL if it not already in the cache.
     By default the file at the url `origin` is downloaded to the
@@ -177,11 +177,12 @@ def get_file(fname, origin, cache_dir=None):
         log.debug("Downloading %s from %s" % (fpath, origin))
         try:
             d = requests.get(origin, stream=True)
-            with tqdm(total=d.headers.get('Content-length', None), desc=fname,
+            with tqdm(total=float(d.headers.get('Content-length') or 0),
+                      desc=fname,
                       unit="B", unit_scale=True, unit_divisor=1024,
                       leave=False) as fprog:
                 with open(fpath, 'wb') as fo:
-                    for chunk in d.iter_content(chunk_size=None):
+                    for chunk in d.iter_content(chunk_size=chunk_size):
                         fo.write(chunk)
                         fprog.update(len(chunk))
                 fprog.total = fprog.n
