@@ -3,3 +3,4 @@ requests
 numpy
 scikit-image
 matplotlib
+pillow>=9.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
