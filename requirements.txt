@@ -3,3 +3,4 @@ requests
 numpy
 scikit-image
 matplotlib
+certifi>=2024.7.4 # not directly required, pinned by Snyk to avoid a vulnerability
