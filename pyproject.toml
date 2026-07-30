@@ -37,6 +37,9 @@ plot = ["matplotlib"]
 register = ["dipy"]
 full = ["matplotlib", "dipy"]
 
+[tool.bandit]
+exclude_dirs = ["tests"]
+
 [tool.flake8]
 max_line_length = 120
 extend_ignore = ["E261"]

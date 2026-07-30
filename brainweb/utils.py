@@ -174,7 +174,8 @@ def get_file(fname, origin, cache_dir=None, chunk_size=None):
         except Exception:
             log.warning("cannot create:" + cache_dir)
     if not os.access(cache_dir, os.W_OK):
-        cache_dir = path.join('/tmp', '.brainweb')
+        from tempfile import gettempdir
+        cache_dir = path.join(gettempdir(), '.brainweb')
         if not path.exists(cache_dir):
             os.makedirs(cache_dir)
 

@@ -39,6 +39,11 @@ repos:
     - requests
     - scikit-image
     - tqdm>=4.42.0
+- repo: https://github.com/PyCQA/bandit
+  rev: 1.9.4
+  hooks:
+  - id: bandit
+    args: [-c, pyproject.toml]
 - repo: https://github.com/PyCQA/flake8
   rev: 7.3.0
   hooks:
@@ -67,4 +72,5 @@ repos:
   hooks:
   - id: isort
 ci:
+  autoupdate_schedule: monthly
   skip: [pytest]
