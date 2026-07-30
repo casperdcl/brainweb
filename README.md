@@ -76,9 +76,9 @@ Convert raw image data:
 - PET/T1/T2/uMap intensities
   - PET defaults to FDG intensity ratios; could use e.g. Amyloid instead
 - randomised structure for PET/T1/T2
-  - $t (1 + g [2 G_sigma(r) - 1])$, where
+  - $t (1 + g [2 G_{\sigma}(r) - 1])$, where
     - r = `rand(127, 344, 344)` $\in [0, 1)$,
-    - Gaussian smoothing sigma = 1,
+    - Gaussian smoothing $\sigma$ = 1,
     - g = 1 for PET; 0.75 for MR, and
     - t = the PET or MR piecewise constant phantom
 
