@@ -396,7 +396,7 @@ def volshow(vol, cmaps=None, colorbars=None, xlabels=None, ylabels=None, titles=
         # make sure to clear extra axes
         for extra in axs[axs.index(ax) + 1:]:
             extra.axis('off')
-        #return fig, axs
+        # return fig, axs
 
     return plot_slice
 
@@ -499,7 +499,7 @@ def add_lesions(im3d, dim=Res.mMR * Shape.mMR, diam=None, intensity=None, blur=N
     msk[im3d.shape[0] // 2 + 1:] = 0
     # make different quadrants
     msk = msk.astype(np.uint8)
-    #msk[:, :im3d.shape[1] // 2, :im3d.shape[2] // 2] *= 1
+    # msk[:, :im3d.shape[1] // 2, :im3d.shape[2] // 2] *= 1
     msk[:, :im3d.shape[1] // 2, im3d.shape[2] // 2:] *= 2
     msk[:, im3d.shape[1] // 2:, :im3d.shape[2] // 2] *= 3
     msk[:, im3d.shape[1] // 2:, im3d.shape[2] // 2:] *= 4
@@ -520,10 +520,10 @@ def add_lesions(im3d, dim=Res.mMR * Shape.mMR, diam=None, intensity=None, blur=N
         if peak > 0:
             im3d = np.max([im3d, tumour], axis=0)
         else:
-            #tROI = tumour > 0
-            #im3d[tROI] = tumour[tROI]
+            # tROI = tumour > 0
+            # im3d[tROI] = tumour[tROI]
             im3d += tumour
-            #im3d[tROI] = np.min([im3d[tROI], tumour[tROI]], axis=0)
+            # im3d[tROI] = np.min([im3d[tROI], tumour[tROI]], axis=0)
 
     return im3d
 
