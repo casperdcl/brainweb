@@ -18,7 +18,7 @@ coregistration.
 
 [![PyPI](https://img.shields.io/pypi/v/brainweb.svg)](https://pypi.org/project/brainweb)
 [![CI](https://img.shields.io/github/actions/workflow/status/casperdcl/brainweb/test.yml?branch=main&label=brainweb&logo=GitHub)](https://github.com/casperdcl/brainweb/actions/workflows/test.yml)
-[![Quality](https://api.codacy.com/project/badge/Grade/cdad13693b0141199c31d5b44c7ab185)](https://www.codacy.com/app/casper-dcl/brainweb)
+[![Quality](https://app.codacy.com/project/badge/Grade/cdad13693b0141199c31d5b44c7ab185)](https://app.codacy.com/gh/casperdcl/brainweb)
 [![DOI](https://img.shields.io/badge/DOI-10.5281/zenodo.3269888-blue.svg)](https://doi.org/10.5281/zenodo.3269888)
 [![LICENCE](https://img.shields.io/pypi/l/brainweb.svg?label=licence)](https://www.mozilla.org/MPL/2.0)
 

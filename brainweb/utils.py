@@ -10,7 +10,12 @@ from os import path
 import numpy as np
 import requests
 from numpy.random import seed
-from scipy.ndimage.filters import gaussian_filter
+
+try:
+    from scipy.ndimage import gaussian_filter
+except ImportError: # scikit-image<2
+    from scipy.ndimage.filters import gaussian_filter
+
 from skimage.transform import resize
 from tqdm.auto import tqdm, trange
 from tqdm.contrib import tenumerate
@@ -178,7 +183,7 @@ def get_file(fname, origin, cache_dir=None, chunk_size=None):
     if not path.exists(fpath):
         log.debug(f"Downloading {fpath} from {origin}")
         try:
-            d = requests.get(origin, stream=True)
+            d = requests.get(origin, stream=True, timeout=(10, None))
             with tqdm(total=float(d.headers.get('Content-length') or 0), desc=fname, unit="B", unit_scale=True,
                       unit_divisor=1024, leave=False) as fprog:
                 with open(fpath, 'wb') as fo:
@@ -583,12 +588,16 @@ def register(src, target=None, ROI=None, target_shape=Shape.mMR, src_resolution=
     """
     from dipy.align.imaffine import AffineMap, transform_centers_of_mass
 
-    assert src.ndim == 3
+    def assert3D(ndim, name):
+        if ndim != 3:
+            raise ValueError(f"{name} must be 3D, got {ndim}D")
+
+    assert3D(src.ndim, "src")
     if target is not None:
-        assert target.ndim == 3
-    assert len(target_shape) == 3
-    assert len(src_resolution) == 3
-    assert len(target_resolution) == 3
+        assert3D(target.ndim, "target")
+    assert3D(len(target_shape), "target_shape")
+    assert3D(len(src_resolution), "src_resolution")
+    assert3D(len(target_resolution), "target_resolution")
 
     if ROI is None:
         ROI = ((0, None),)
