@@ -1,30 +1,30 @@
-name: Test
+name: ci
 on:
-- push
+  push:
+  pull_request:
+  schedule: [{cron: '4 3 1 * *'}]  # M H d m w (monthly at 3:04)
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: [2.7, 3.7]
-    name: Check py${{ matrix.python }}
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python }}
-    - run: pip install .[test]
-    - run: python setup.py check -mrs
-    - run: flake8 --extend-ignore=E265
   deploy:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
-    needs: check
     name: PyPI Deploy
     runs-on: ubuntu-latest
+    environment: pypi
+    permissions: {contents: write, id-token: write, packages: write}
     steps:
-      - uses: actions/checkout@v2
-      - uses: casperdcl/deploy-pypi@v1
-        with:
-           password: ${{ secrets.pypi_token }}
-           build: true
-           gpg_key: ${{ secrets.gpg_key }}
+    - uses: actions/checkout@v7
+      with: {fetch-depth: 0}
+    - uses: actions/setup-python@v7
+      with: {python-version: '3.x'}
+    - id: dist
+      uses: casperdcl/deploy-pypi@v3
+      with:
+        gpg_key: ${{ secrets.gpg_key }}
+        upload: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}
+    - if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      name: Release
+      run: |
+        changelog=$(git log --pretty='format:%d%n- %s%n%b---' $(git tag --sort=v:refname | tail -n2 | head -n1)..HEAD)
+        tag="${GITHUB_REF#refs/tags/}"
+        gh release create --title "BrainWeb-based multimodal models $tag" --draft --notes "$changelog" "$tag" dist/${{ steps.dist.outputs.whl }} dist/${{ steps.dist.outputs.whl_asc }}
+      env:
+        GH_TOKEN: ${{ github.token }}

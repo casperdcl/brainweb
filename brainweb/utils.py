@@ -1,5 +1,5 @@
 """General helper functions."""
-from __future__ import division
+from importlib.metadata import PackageNotFoundError, version
 import numpy as np
 from numpy.random import seed
 from skimage.transform import resize
@@ -16,7 +16,13 @@ import logging
 
 __author__ = "Casper O. da Costa-Luis <casper.dcl@physics.org>"
 __date__ = "2017-20"
-__licence__ = __license__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
+__licence__ = "[MPLv2.0](https://www.mozilla.org/MPL/2.0)"
+__copyright__ = ' '.join(("Copyright (c)", __date__, __author__, __licence__))
+# version detector. Precedence: installed dist, git, 'UNKNOWN'
+try:
+    __version__ = version('brainweb')
+except PackageNotFoundError:
+    __version__ = "UNKNOWN"
 __all__ = [
     # necessary
     "volshow", "get_files", "get_mmr_fromfile",

@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=42", "setuptools-scm[toml]>=3.4"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+
+[tool.setuptools.packages.find]
+include = ["brainweb"]
+
+[project.urls]
+repository = "https://github.com/casperdcl/brainweb"
+changelog = "https://github.com/casperdcl/brainweb/releases"
+
+[project]
+name = "brainweb"
+dynamic = ["version"]
+authors = [{name = "Casper da Costa-Luis", email = "casper.dcl@physics.org"}]
+description = "BrainWeb-based multimodal models of 20 normal brains"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["pet-mr", "volume-rendering", "neuroimaging", "fdg", "mri"]
+license = {text = "MPL-2.0"}
+# Trove classifiers (https://pypi.org/pypi?%3Aaction=list_classifiers)
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Education",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3"]
+dependencies = [
+    "tqdm>=4.42.0",
+    "numpy",
+    "requests",
+    "scikit-image"]
+[project.optional-dependencies]
+plot = ["matplotlib"]
+register = ["dipy"]
+full = ["matplotlib", "dipy"]
+
+[tool.flake8]
+max_line_length = 120
+extend_ignore = ["E261"]
+exclude = [".git", "__pycache__", "build", "dist", ".eggs"]
+
+[tool.yapf]
+spaces_before_comment = [15, 20]
+arithmetic_precedence_indication = true
+allow_split_before_dict_value = false
+coalesce_brackets = true
+column_limit = 120
+each_dict_entry_on_separate_line = false
+space_between_ending_comma_and_closing_bracket = false
+split_before_named_assigns = false
+split_before_closing_bracket = false
+blank_line_before_nested_class_or_def = false
+
+[tool.isort]
+line_length = 120
+known_first_party = ["brainweb"]
