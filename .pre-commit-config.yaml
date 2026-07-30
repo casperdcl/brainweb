@@ -26,6 +26,24 @@ repos:
     args: [-i]
     types: [text]
     exclude: ^(.pre-commit-config.yaml|.github/workflows/test.yml)$
+  - id: pytest
+    name: pytest
+    language: python
+    entry: env PYTHONPATH=. pytest
+    args: [--cov=brainweb, -vv, -k=quick]
+    types: [python]
+    pass_filenames: false
+    additional_dependencies:
+    - pytest-cov
+    - numpy
+    - requests
+    - scikit-image
+    - tqdm>=4.42.0
+- repo: https://github.com/PyCQA/bandit
+  rev: 1.9.4
+  hooks:
+  - id: bandit
+    args: [-c, pyproject.toml]
 - repo: https://github.com/PyCQA/flake8
   rev: 7.3.0
   hooks:
@@ -53,3 +71,6 @@ repos:
   rev: 9.0.0b1
   hooks:
   - id: isort
+ci:
+  autoupdate_schedule: monthly
+  skip: [pytest]

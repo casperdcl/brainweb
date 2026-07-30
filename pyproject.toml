@@ -27,14 +27,18 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3"]
 dependencies = [
-    "tqdm>=4.42.0",
     "numpy",
     "requests",
-    "scikit-image"]
+    "scikit-image",
+    "tqdm>=4.42.0"]
 [project.optional-dependencies]
+dev = ["pytest>=6", "pytest-cov"]
 plot = ["matplotlib"]
 register = ["dipy"]
 full = ["matplotlib", "dipy"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
 
 [tool.flake8]
 max_line_length = 120
@@ -55,4 +59,15 @@ blank_line_before_nested_class_or_def = false
 
 [tool.isort]
 line_length = 120
-known_first_party = ["brainweb"]
+known_first_party = ["brainweb", "tests"]
+
+[tool.pytest.ini_options]
+log_level = "INFO"
+testpaths = ["tests"]
+markers = ["quick"]
+addopts = "-v --tb=short -rxs -W=error --durations=0 --durations-min=0.1"
+
+[tool.coverage.run]
+branch = true
+[tool.coverage.report]
+show_missing = true
