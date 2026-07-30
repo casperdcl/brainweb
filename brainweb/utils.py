@@ -614,7 +614,9 @@ def register(src, target=None, ROI=None, target_shape=Shape.mMR, src_resolution=
     affine_init[:3, -1] -= moving.shape * src_resolution / target_resolution
     affine_init[:3, -1] /= 2
     affine_init[:3, -1] += src_offset
-    affine_map = AffineMap(np.eye(4), target_shape, np.eye(4), moving.shape, affine_init) # unmoved target
+    # unmoved target
+    affine_map = AffineMap(np.eye(4), domain_grid_shape=target_shape, domain_grid2world=np.eye(4),
+                           codomain_grid_shape=moving.shape, codomain_grid2world=affine_init)
     src = affine_map.transform(moving)
 
     if target is not None:

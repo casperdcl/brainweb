@@ -4,8 +4,41 @@ on:
   pull_request:
   schedule: [{cron: '4 3 1 * *'}]  # M H d m w (monthly at 3:04)
 jobs:
+  test:
+    if: github.event_name != 'pull_request' || !contains('OWNER,MEMBER,COLLABORATOR', github.event.pull_request.author_association)
+    strategy:
+      matrix:
+        python: [3.8, 3.14]
+        os: [ubuntu]
+        include: [{os: macos, python: 3.14}, {os: windows, python: 3.14}]
+    runs-on: ${{ matrix.os }}-latest
+    timeout-minutes: 5
+    defaults: {run: {shell: bash}}
+    steps:
+    - uses: actions/checkout@v7
+      with: {fetch-depth: 0}
+    - uses: actions/setup-python@v7
+      with:
+        python-version: ${{ matrix.python }}
+    - run: pip install -e .[full,dev]
+    - run: pytest --cov=brainweb --cov-fail-under=50 --cov-report=xml --cov-report=term-missing
+    - name: codacy
+      run: |
+        bash <(curl -fsL https://coverage.codacy.com/get.sh) report -l Python -r coverage.xml --partial || :
+      env:
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+  finish:
+    continue-on-error: ${{ github.event_name != 'push' }}
+    needs: test
+    runs-on: ubuntu-slim
+    steps:
+    - name: codacy
+      run: |
+        bash <(curl -fsL https://coverage.codacy.com/get.sh) final || :
+      env:
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
   deploy:
-    name: PyPI Deploy
+    needs: test
     runs-on: ubuntu-latest
     environment: pypi
     permissions: {contents: write, id-token: write, packages: write}
